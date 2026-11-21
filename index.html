@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f6f54">
+  <meta name="description" content="Denunciá y relevá basurales en el Gran Resistencia.">
+  <title>Basurales Gran Resistencia</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="barra">
+    <h1>Basurales <span>Gran Resistencia</span></h1>
+    <button id="btn-info" class="icono" aria-label="Información">?</button>
+  </header>
+
+  <main id="mapa" aria-label="Mapa de basurales"></main>
+
+  <!-- Leyenda del semáforo -->
+  <div class="leyenda" aria-label="Referencias">
+    <span><i class="punto rojo"></i>Activo</span>
+    <span><i class="punto amarillo"></i>En gestión</span>
+    <span><i class="punto verde"></i>Resuelto</span>
+  </div>
+
+  <!-- Aviso de reportes esperando señal -->
+  <div id="pendientes" class="pendientes" hidden></div>
+
+  <!-- Botón principal -->
+  <button id="btn-denunciar" class="btn-principal">+ Denunciar basural</button>
+
+  <!-- Modo elegir ubicación -->
+  <div id="mira" class="mira" hidden aria-hidden="true">
+    <svg viewBox="0 0 24 36" width="36" height="54"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#d93025"/><circle cx="12" cy="12" r="4.5" fill="#fff"/></svg>
+  </div>
+  <div id="panel-ubicacion" class="panel-ubicacion" hidden>
+    <p>Mové el mapa hasta que el pin quede sobre el basural.</p>
+    <div class="fila-botones">
+      <button id="btn-gps" class="btn-secundario">Mi ubicación</button>
+      <button id="btn-cancelar-ubic" class="btn-secundario">Cancelar</button>
+      <button id="btn-confirmar-ubic" class="btn-primario">Confirmar</button>
+    </div>
+  </div>
+
+  <!-- Formulario (hoja inferior) -->
+  <section id="hoja" class="hoja" hidden aria-labelledby="titulo-hoja">
+    <form id="form" novalidate>
+      <div class="hoja-cabecera">
+        <h2 id="titulo-hoja">Nuevo reporte</h2>
+        <button type="button" id="btn-cerrar" class="icono" aria-label="Cerrar">×</button>
+      </div>
+
+      <p class="ubicacion-elegida" id="ubicacion-texto"></p>
+
+      <label class="campo-foto">
+        <span>Foto (opcional)</span>
+        <input type="file" id="foto" accept="image/*">
+        <span class="btn-foto" id="btn-foto-texto">Sacar o elegir foto</span>
+        <img id="foto-preview" alt="Vista previa de la foto" hidden>
+      </label>
+
+      <details class="relevamiento">
+        <summary>Relevamiento (opcional)</summary>
+
+        <label>Tipo de residuo
+          <select name="tipo">
+            <option value="">No sé</option>
+            <option value="domiciliario">Domiciliario (bolsas, restos)</option>
+            <option value="verde_poda">Verde / poda</option>
+            <option value="escombros">Escombros</option>
+            <option value="neumaticos">Neumáticos</option>
+            <option value="mixto">Mezcla</option>
+            <option value="otro">Otro</option>
+          </select>
+        </label>
+
+        <label>Tamaño aproximado
+          <select name="tamano">
+            <option value="">No sé</option>
+            <option value="bolsas">Unas bolsas</option>
+            <option value="carretilla">Una carretilla</option>
+            <option value="camioneta">Una camioneta</option>
+            <option value="camion_o_mas">Un camión o más</option>
+          </select>
+        </label>
+
+        <label>¿Hace cuánto está?
+          <select name="antiguedad">
+            <option value="">No sé</option>
+            <option value="dias">Días</option>
+            <option value="semanas">Semanas</option>
+            <option value="meses">Meses</option>
+            <option value="mas_de_un_anio">Más de un año</option>
+          </select>
+        </label>
+
+        <fieldset class="checks">
+          <legend>Marcá lo que corresponda</legend>
+          <label><input type="checkbox" name="quema"> Lo queman o hay restos de quema</label>
+          <label><input type="checkbox" name="cerca_agua"> Está cerca de un canal, laguna o zanja</label>
+          <label><input type="checkbox" name="cerca_escuela"> Está cerca de una escuela o centro de salud</label>
+        </fieldset>
+
+        <label>Comentario
+          <textarea name="descripcion" maxlength="500" rows="3"
+            placeholder="Referencia del lugar, sin datos personales"></textarea>
+        </label>
+      </details>
+
+      <!-- Campo trampa para bots: las personas no lo ven -->
+      <input type="text" name="sitio_web" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+      <p class="aviso-privacidad">No pedimos tu nombre ni guardamos quién reporta. Las fotos se revisan antes de usarse.</p>
+
+      <button type="submit" id="btn-enviar" class="btn-primario ancho">Enviar reporte</button>
+    </form>
+  </section>
+
+  <!-- Información -->
+  <dialog id="dlg-info">
+    <h2>¿Cómo funciona?</h2>
+    <p>Tocá <b>Denunciar basural</b>, ubicá el pin y enviá. Si querés, sumá una foto y completá el relevamiento.</p>
+    <p>Los reportes se revisan antes de aparecer en el mapa. Los colores indican el estado: rojo activo, amarillo en gestión, verde resuelto.</p>
+    <p>Si no tenés señal, el reporte queda guardado en tu celular y se envía solo la próxima vez que abras la página con conexión.</p>
+    <form method="dialog"><button class="btn-primario ancho">Entendido</button></form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

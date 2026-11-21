@@ -1,0 +1,26 @@
+# Procesos sobre los datos descargados
+
+Cada script hace un paso y se puede volver a correr. Funcionan:
+- **En QGIS:** Complementos > Consola de Python > Mostrar editor > abrir el script > Ejecutar. Agrega el resultado al mapa.
+- **Fuera de QGIS:** `python <script>.py` (requiere `pip install pyshp`).
+
+Rutas:
+- **Salida principal:** `datos\<tema>\`, relativa a la carpeta del proyecto (no hay que configurarla).
+- **Rutas de cada computadora:** origen de los radios (`ORIGEN_RADIOS`) y carpetas donde se guarda una copia (`COPIAS`) van en `scripts\rutas_locales.py`. Ese archivo no se sube al repositorio: copiá `rutas_locales.ejemplo.py` como `rutas_locales.py` y completalo.
+- Las capas que se toman del proyecto de QGIS se buscan por nombre (`CAPA` o `PREFIJOS` al principio de cada script).
+Si la capa de salida está abierta en QGIS, quitala del proyecto antes de volver a correr el script: Windows no deja sobrescribir un shapefile en uso.
+
+## Convención
+Todo script nuevo guarda en `datos\<tema>\` y en cada carpeta de `COPIAS` (definidas en `rutas_locales.py`), usa rutas relativas al proyecto, funciona en QGIS y fuera de QGIS, y se anota en el registro.
+
+## Registro
+
+| # | Script | Fecha | Entrada | Salida | Resultado |
+| --- | --- | --- | --- | --- | --- |
+| 01 | `01_recorte_radios.py` | 2026-11-21 | `radios2022_v1.0.shp` (Rodriguez, CONICET 2024; 66.502 radios, WGS84, sin población) | `datos\radios\radios_gran_resistencia_2022` (.shp y .geojson) | 567 radios: San Fernando 529, Libertad 22, 1° de Mayo 16. Probado en QGIS 3.34, QGIS 3.40 y pyshp: mismo resultado |
+| 02 | `02_recorte_salud.py` | 2026-11-21 | Capa `Puntos_Salud_Chaco` del proyecto QGIS (IGN) | `datos\salud\salud_gran_resistencia` (.shp y .geojson, EPSG:4326) | 42 establecimientos (30 centros de salud, 4 hospitales, 2 de salud mental y 6 de otros tipos), todos con nombre (`fna`). La capa trae campos duplicados con sufijo `_2` (viene de una unión) |
+| 03 | `03_recorte_educacion.py` | 2026-11-21 | Capa `Puntos_de_Ciencia_y_Educacion_Chaco` del proyecto QGIS (IGN) | `datos\educacion\educacion_gran_resistencia` (.shp y .geojson, EPSG:4326) | 494 puntos: 120 primarias de adultos, 100 primarias, 90 jardines, 66 de gestión privada, 56 secundarias y 62 de otros tipos. El IGN carga un punto por servicio educativo, no por edificio: 23 puntos comparten ubicación. `TIPOS_EXCLUIR` vacío: falta decidir qué tipos excluir |
+| 04 | `04_recorte_hidrografia.py` | 2026-11-21 | Capas `areas_de_aguas_continentales_*` y `lineas_de_aguas_continentales_*` del proyecto QGIS (IGN) | `datos\hidrografia\`: `agua_areas_gran_resistencia` y `agua_lineas_gran_resistencia` (.shp y .geojson) + `agua_gran_resistencia.geojson` (todo junto, para `capa_agua`) | Primera corrida: 213 polígonos, 0 líneas; 142 eran geometrías repetidas (la misma capa del IGN cargada 3 veces) y los acentos salieron rotos (archivo en Windows-1252 leído como UTF-8). Script corregido: relee en Windows-1252 cuando detecta acentos rotos y descarta geometrías repetidas. **Volver a correr.** Campos: nombre, tipo, regimen, capa |
+
+## Pendientes
+- 05: unir población y viviendas por radio (REDATAM, Censo 2022) usando el campo `LINK`.

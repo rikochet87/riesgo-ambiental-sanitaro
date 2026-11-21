@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+
+# Rutas propias de cada computadora (ver scripts/rutas_locales.ejemplo.py)
+scripts/rutas_locales.py
+
+# Datos originales descargados (pesados; se citan en docs/04_fuentes_capas.md)
+fuentes/
