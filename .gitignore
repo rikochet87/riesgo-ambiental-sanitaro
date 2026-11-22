@@ -15,3 +15,6 @@ node_modules/
 .env
 .env.*
 .vercel/
+
+# Página intermedia que arma diseno/tarjeta/generar.py (se regenera)
+diseno/tarjeta/tarjeta.html
