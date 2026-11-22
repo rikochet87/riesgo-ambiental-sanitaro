@@ -157,6 +157,22 @@ body.admin { height: 100vh; height: 100dvh; }
 }
 .btn-quitar.confirmar { color: #fff; background: var(--rojo); padding: 8px 12px; border-radius: var(--radio-m); text-decoration: none; }
 
+/* Eliminar: separado de las acciones de moderar, y siempre con confirmación */
+.zona-eliminar { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--borde); }
+.btn-eliminar {
+  padding: 6px 0; border: 0; background: none;
+  color: var(--texto-suave); font-weight: 650; font-size: 14px; text-decoration: underline; text-underline-offset: 3px;
+}
+.btn-eliminar:hover { color: var(--rojo); }
+.confirmar-eliminar {
+  margin-top: 4px; padding: 12px; border: 1.5px solid var(--rojo); border-radius: var(--radio-m);
+  background: #fff5f5; font-size: 15px;
+}
+.confirmar-eliminar p { margin: 0 0 8px; }
+.confirmar-eliminar .sin-copia { color: #a11d1d; font-weight: 650; }
+.confirmar-eliminar .fila-botones { margin-top: 10px; }
+.btn-peligro { min-height: 46px; border: 0; border-radius: var(--radio-m); background: var(--rojo); color: #fff; font-weight: 750; }
+
 /* Etiqueta al pasar sobre un punto */
 .leaflet-tooltip.etiqueta-reporte { font: 600 13px/1.3 Archivo, sans-serif; padding: 4px 8px; }
 

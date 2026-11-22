@@ -8,8 +8,9 @@
 -- puede hacer, el panel tampoco, aunque tenga un error.
 --
 -- El moderador puede: leer los reportes (con foto y descripción), cambiar
--- el estado, aprobar o despublicar la foto, quitarla, y dejar una nota.
--- No puede: borrar reportes, cambiar la ubicación ni los datos del vecino.
+-- el estado, aprobar o despublicar la foto, quitarla, dejar una nota y
+-- eliminar un reporte entero (desde 2026-11-22, a pedido; el panel pide
+-- confirmación). No puede: cambiar la ubicación ni los datos del vecino.
 -- =====================================================================
 
 do $$
@@ -28,10 +29,14 @@ grant usage on schema public to moderador;
 grant select on public.reportes to moderador;
 -- foto: solo para quitarla (el panel nunca escribe otra cosa que null)
 grant update (estado, foto_aprobada, foto, revisado_en, nota_admin) on public.reportes to moderador;
+-- Eliminar un reporte entero. Su fila en amenaza_satelital se va con él (on delete cascade).
+grant delete on public.reportes to moderador;
 
 -- La tabla tiene RLS: sin estas políticas el moderador no vería ni una fila
 drop policy if exists "moderador_lee" on public.reportes;
 create policy "moderador_lee" on public.reportes for select to moderador using (true);
+drop policy if exists "moderador_elimina" on public.reportes;
+create policy "moderador_elimina" on public.reportes for delete to moderador using (true);
 drop policy if exists "moderador_modera" on public.reportes;
 create policy "moderador_modera" on public.reportes for update to moderador using (true) with check (true);
 

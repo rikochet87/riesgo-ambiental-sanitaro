@@ -387,7 +387,11 @@ function volverALista() {
 }
 $('btn-volver').addEventListener('click', volverALista);
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('vista-ficha').hidden) volverALista();
+  if (e.key !== 'Escape') return;
+  // Primero se cancela la confirmación de eliminar, si está abierta
+  const confirmacion = document.querySelector('#ficha .confirmar-eliminar:not([hidden])');
+  if (confirmacion) { cerrarConfirmacion(confirmacion.closest('.tarjeta')); return; }
+  if (!$('vista-ficha').hidden) volverALista();
 });
 
 const formatoFecha = new Intl.DateTimeFormat('es-AR', {
@@ -478,7 +482,59 @@ async function cargarFoto(hueco) {
 // ---------------------------------------------------------------------
 // Acciones
 // ---------------------------------------------------------------------
+// Eliminar pide confirmación dentro de la ficha. El foco va a "Cancelar":
+// un Enter o un toque apurado no borran nada.
+function abrirConfirmacion(el) {
+  const caja = el.querySelector('.confirmar-eliminar');
+  caja.querySelector('.sin-copia').hidden = !copiaAtrasada;
+  caja.hidden = false;
+  el.querySelector('.btn-eliminar').hidden = true;
+  caja.querySelector('[data-accion="eliminar-cancelar"]').focus();
+  caja.scrollIntoView({ block: 'nearest' });
+}
+
+function cerrarConfirmacion(el) {
+  el.querySelector('.confirmar-eliminar').hidden = true;
+  const boton = el.querySelector('.btn-eliminar');
+  boton.hidden = false;
+  boton.focus();
+}
+
+function sacarDeLaVista(r) {
+  reportes = reportes.filter((x) => x.id !== r.id);
+  cantidades[r.estado] = Math.max(0, (cantidades[r.estado] || 0) - 1);
+  pintarCantidades();
+  cacheIndice.clear();   // el índice de los vecinos cuenta los activos cercanos
+  volverALista();
+  dibujarPuntos();
+}
+
+async function eliminar(el, r) {
+  el.classList.add('ocupada');
+  try {
+    await api('/reportes', { method: 'DELETE', body: JSON.stringify({ id: r.id }) });
+    sacarDeLaVista(r);
+    aviso('Reporte eliminado.');
+  } catch (err) {
+    if (err.status === 404) {
+      sacarDeLaVista(r);
+      aviso('Ese reporte ya no existía.');
+    } else if (!siSeCortoLaSesion(err)) {
+      aviso('No se pudo eliminar. ' + err.message, true);
+    }
+  } finally {
+    el.classList.remove('ocupada');
+  }
+}
+
 async function accion(el, r, boton) {
+  switch (boton.dataset.accion) {
+    case 'eliminar': abrirConfirmacion(el); return;
+    case 'eliminar-cancelar': cerrarConfirmacion(el); return;
+    case 'eliminar-confirmado': await eliminar(el, r); return;
+    default: break;
+  }
+
   const nota = el.querySelector('.nota textarea').value;
   let cambio;
   let mensaje;

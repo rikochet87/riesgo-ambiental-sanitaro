@@ -125,6 +125,19 @@
       </div>
 
       <button class="btn-quitar" data-accion="quitar-foto" hidden>Quitar la foto</button>
+
+      <div class="zona-eliminar">
+        <button class="btn-eliminar" data-accion="eliminar">Eliminar reporte</button>
+        <div class="confirmar-eliminar" role="alertdialog" aria-label="Confirmar eliminación" hidden>
+          <p><b>¿Eliminar este reporte para siempre?</b> Se borran la foto, la ubicación y todos sus datos. No se puede deshacer.</p>
+          <p class="suave">Si solo querés sacarlo del mapa, usá Descartar: queda guardado.</p>
+          <p class="sin-copia" hidden>No hay una copia de seguridad reciente: si te arrepentís, no habrá de dónde recuperarlo.</p>
+          <div class="fila-botones">
+            <button class="btn-claro" data-accion="eliminar-cancelar">Cancelar</button>
+            <button class="btn-peligro" data-accion="eliminar-confirmado">Eliminar para siempre</button>
+          </div>
+        </div>
+      </div>
     </article>
   </template>
 

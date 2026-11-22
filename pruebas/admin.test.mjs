@@ -185,8 +185,8 @@ test('pedidos inválidos: estado inventado, id inexistente, solo campos no permi
   assert.equal((await moderar.GET(pedir('/api/admin/reportes?estado=cualquiera', { cookie }))).status, 400);
 });
 
-test('el rol moderador, aunque el código fallara, no puede borrar ni mover un reporte', async () => {
-  for (const sql of ['delete from public.reportes', 'update public.reportes set lat = -27.0',
+test('el rol moderador, aunque el código fallara, no puede mover un reporte ni editar lo del vecino', async () => {
+  for (const sql of ['update public.reportes set lat = -27.0',
                      'update public.reportes set descripcion = $$x$$', 'select * from public.admin_intentos']) {
     await assert.rejects(ejecutorLocal('moderador', [[sql, []]]), (e) => e.code === '42501', sql);
   }
@@ -296,6 +296,40 @@ test('las funciones del índice: cada rol solo llega a su puerta', async () => {
   for (const [rol, sql] of casos) {
     await assert.rejects(ejecutorLocal(rol, [[sql, []]]), (e) => e.code === '42501', `${rol}: ${sql}`);
   }
+});
+
+test('eliminar: exige sesión, mismo sitio y JSON; borra el reporte entero y su análisis satelital', async () => {
+  const ID_BORRAR = '66666666-6666-4666-8666-666666666666';
+  await admin(`insert into public.reportes (id, lat, lon, estado, foto) values ($1, -27.45, -58.97, 'verificado', '\\x01'::bytea)`, [ID_BORRAR]);
+  await admin('insert into public.amenaza_satelital (reporte_id, area_m2) values ($1, 900)', [ID_BORRAR]);
+  const cuerpo = { id: ID_BORRAR };
+
+  assert.equal((await moderar.DELETE(pedir('/api/admin/reportes', { metodo: 'DELETE', cuerpo, origen: SITIO }))).status, 401);
+  const cookie = await sesion();
+  assert.equal((await moderar.DELETE(pedir('/api/admin/reportes',
+    { metodo: 'DELETE', cuerpo, cookie, origen: 'https://otro-sitio.com' }))).status, 403);
+  assert.equal((await moderar.DELETE(pedir('/api/admin/reportes',
+    { metodo: 'DELETE', cuerpo, cookie, origen: SITIO, tipo: 'text/plain' }))).status, 415);
+  assert.equal((await moderar.DELETE(pedir('/api/admin/reportes',
+    { metodo: 'DELETE', cuerpo: { id: 'nada' }, cookie, origen: SITIO }))).status, 400);
+  const [{ n: sigue }] = await admin('select count(*)::int as n from public.reportes where id = $1', [ID_BORRAR]);
+  assert.equal(sigue, 1, 'ninguno de esos pedidos tiene que haber borrado nada');
+
+  const r = await leer(await moderar.DELETE(pedir('/api/admin/reportes', { metodo: 'DELETE', cuerpo, cookie, origen: SITIO })));
+  assert.equal(r.estado, 200);
+  assert.equal(r.cuerpo.eliminado, ID_BORRAR);
+  const [quedan] = await admin(`select (select count(*)::int from public.reportes where id = $1) as reporte,
+                                       (select count(*)::int from public.amenaza_satelital where reporte_id = $1) as satelite`, [ID_BORRAR]);
+  assert.deepEqual(quedan, { reporte: 0, satelite: 0 });
+  const mapa = await (await reportesPublicos.GET(pedir('/api/reportes'))).json();
+  assert.ok(!mapa.some((x) => x.id === ID_BORRAR), 'ya no está en el mapa público');
+
+  const otraVez = await leer(await moderar.DELETE(pedir('/api/admin/reportes', { metodo: 'DELETE', cuerpo, cookie, origen: SITIO })));
+  assert.equal(otraVez.estado, 404);
+});
+
+test('el público sigue sin poder borrar nada', async () => {
+  await assert.rejects(ejecutorLocal('anonymous', [['delete from public.reportes', []]]), (e) => e.code === '42501');
 });
 
 test('salir vence la cookie', async () => {

@@ -1,5 +1,6 @@
 // GET   /api/admin/reportes?estado=todos&pagina=0  → reportes de ese estado (o todos), de a 1000
 // PATCH /api/admin/reportes {id, estado?, foto_aprobada?, quitar_foto?, nota_admin?}
+// DELETE /api/admin/reportes {id}  → elimina el reporte entero (el panel pide confirmación)
 // Todo con el rol moderador, y solo con la sesión abierta.
 import { comoModerador } from '../_db.js';
 import { json, malPedido, errorDeBase, UUID } from '../_http.js';
@@ -80,6 +81,25 @@ export async function PATCH(request) {
     ]]);
     if (!filas.length) return json({ code: 'NO_EXISTE', message: 'Ese reporte no existe.' }, 404);
     return json(filas[0]);
+  } catch (err) {
+    return errorDeBase(err);
+  }
+}
+
+export async function DELETE(request) {
+  // Mismo control que cualquier cambio: sesión, mismo sitio y JSON
+  const corte = controlar(request, { cambia: true });
+  if (corte) return corte;
+
+  const datos = await leerJSON(request, 200);
+  if (!datos || !UUID.test(String(datos.id ?? ''))) return malPedido('Identificador inválido.');
+
+  try {
+    const [filas] = await comoModerador([[
+      'delete from public.reportes where id = $1 returning id, estado', [datos.id],
+    ]]);
+    if (!filas.length) return json({ code: 'NO_EXISTE', message: 'Ese reporte ya no existe.' }, 404);
+    return json({ eliminado: filas[0].id, estado: filas[0].estado });
   } catch (err) {
     return errorDeBase(err);
   }

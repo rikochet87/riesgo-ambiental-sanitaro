@@ -66,6 +66,7 @@ Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la 
 - **Publicar** pasa un pendiente a activo, con o sin su foto; el punto cambia de color en el acto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado y se publica o despublica la foto.
 - **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
 - Nota interna por reporte, que nunca se publica.
+- **Eliminar reporte** lo borra entero de la base (foto, ubicación y datos). Pide confirmación con "Cancelar" seleccionado de entrada, sugiere Descartar si solo se quiere sacarlo del mapa, y avisa si no hay una copia de seguridad reciente. No tiene vuelta atrás salvo esa copia, o dentro de las 6 horas que guarda Neon.
 - En la compu, el panel va a la izquierda y el mapa a la derecha. En el celular, el mapa ocupa la pantalla y el panel es una hoja que sube desde abajo: baja (resumen y capas), media (ficha con el punto a la vista) o alta (lista).
 
 Lo publicado puede tardar un par de minutos en verse en el mapa: la CDN de Vercel guarda la lista unos minutos.
@@ -86,7 +87,7 @@ El ZIP se arma en el navegador porque Vercel no deja que una función devuelva m
 **Seguridad del panel:**
 - La sesión es una cookie firmada, válida 8 horas, que solo viaja a `/api/admin`, no la puede leer JavaScript y no se manda desde otros sitios. Cambiar `ADMIN_CLAVE` cierra todas las sesiones.
 - Con 10 claves incorrectas en 15 minutos se bloquea la entrada (incluso con la correcta) hasta que pasen.
-- Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes y cambiar estado, foto y nota, pero **no puede borrar reportes ni mover su ubicación**, aunque el código tuviera un error.
+- Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes, cambiar estado, foto y nota, y eliminar un reporte entero, pero **no puede mover su ubicación ni editar lo que escribió el vecino**, aunque el código tuviera un error.
 - Lo que escribe el vecino se muestra siempre como texto, nunca como HTML.
 
 También se puede moderar desde el *SQL Editor* de Neon; hay consultas listas al final de `neon/schema.sql`.

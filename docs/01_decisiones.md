@@ -54,6 +54,13 @@ Las pruebas encontraron dos errores, ya corregidos:
 - Al reintentar un reporte que sí había llegado, el trigger contestaba "ya hay uno en ese lugar" (encontraba al mismo reporte) en vez de "ya está cargado". Venía del diseño original. Ahora el control de duplicados ignora el propio id.
 - La página tomaba cualquier respuesta 409 como "ya estaba cargado". Un vecino que reportaba donde ya había otro reporte reciente veía "¡Gracias!" sin que se guardara nada. Ahora se decide por el código de error, no por el estado HTTP.
 
+## Eliminar reportes desde el panel (2026-11-22)
+El rol `moderador` se diseñó sin permiso para borrar, como red de seguridad ante un error del panel. A pedido, se le dio `delete` sobre `reportes` para poder eliminar un reporte entero (casos: datos personales, pruebas, contenido que no debe quedar guardado). Lo compensan:
+- Confirmación en la ficha, con el foco en "Cancelar"; `Esc` cancela antes de cerrar la ficha.
+- La confirmación sugiere Descartar (que conserva el reporte) y avisa si no hay copia de seguridad reciente.
+- El servidor exige sesión, mismo sitio y JSON, igual que cualquier cambio.
+- El moderador sigue sin poder mover la ubicación ni editar lo que escribió el vecino.
+
 ## Puntos a resolver
 - El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.
