@@ -1,0 +1,118 @@
+/* Panel de moderación. Usa las variables y botones de styles.css y del tema. */
+
+body.admin { display: block; height: auto; min-height: 100%; overflow: auto; }
+.admin .barra { position: sticky; top: 0; }
+.admin .toast { position: fixed; bottom: calc(24px + var(--seguro-abajo)); }
+
+.btn-barra {
+  border: 1.5px solid rgba(255, 255, 255, .35); background: none; color: #fff;
+  padding: 7px 14px; border-radius: var(--radio-m); font-weight: 650;
+}
+
+.suave { color: var(--texto-suave); }
+.error { margin: 10px 0 0; color: var(--rojo); font-weight: 600; }
+
+/* ---------- Entrada ---------- */
+.entrada { display: flex; justify-content: center; padding: 48px 16px; }
+.caja-entrada {
+  width: 100%; max-width: 380px; padding: 24px 22px;
+  background: var(--fondo, #fff); border: 1px solid var(--borde); border-radius: var(--radio-l);
+}
+.caja-entrada h2 { margin: 0; font-size: 24px; font-weight: 800; font-stretch: 110%; }
+.caja-entrada .suave { margin: 4px 0 18px; }
+.caja-entrada .btn-lapacho { margin-top: 16px; min-height: 50px; }
+
+.campo { display: block; margin-top: 12px; }
+.campo > span { display: block; margin-bottom: 6px; font-weight: 700; font-size: 15px; }
+.campo small { font-weight: 500; color: var(--texto-suave); }
+.campo input, .campo textarea, .campo select {
+  width: 100%; padding: 11px 12px; font: inherit; color: var(--tinta);
+  background: #fff; border: 1.5px solid var(--borde); border-radius: var(--radio-m);
+}
+.campo input:focus-visible, .campo textarea:focus-visible, .campo select:focus-visible {
+  outline: 3px solid var(--lapacho); outline-offset: 1px;
+}
+
+/* ---------- Panel ---------- */
+.panel { max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; }
+
+.filtros { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.filtros::-webkit-scrollbar { display: none; }
+.filtros button {
+  flex: none; padding: 9px 13px; border: 1.5px solid var(--borde); border-radius: var(--radio-m);
+  background: #fff; color: var(--tinta); font-weight: 650; white-space: nowrap;
+}
+.filtros button b {
+  display: inline-block; min-width: 22px; margin-left: 4px; padding: 1px 6px; border-radius: 10px;
+  background: var(--fondo-suave); font-size: 13px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.filtros button[aria-pressed="true"] { background: var(--petroleo); border-color: var(--petroleo); color: #fff; }
+.filtros button[aria-pressed="true"] b { background: rgba(255, 255, 255, .18); }
+.nota-mapa { margin: 10px 2px 14px; font-size: 14px; }
+
+.lista { display: grid; gap: 14px; }
+.vacio { margin: 30px 0; text-align: center; color: var(--texto-suave); }
+
+/* ---------- Tarjeta de reporte ---------- */
+.tarjeta {
+  padding: 14px; background: #fff; border: 1px solid var(--borde); border-radius: var(--radio-l);
+}
+.tarjeta.ocupada { opacity: .55; pointer-events: none; }
+.tarjeta-cab { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 14px; }
+.estado {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 20px;
+  font-weight: 700; font-size: 13px; background: var(--fondo-suave);
+}
+.estado::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--color, #8a948a); }
+.estado[data-estado="verificado"] { --color: var(--rojo); }
+.estado[data-estado="en_gestion"] { --color: var(--ambar); }
+.estado[data-estado="resuelto"] { --color: var(--verde); }
+.estado[data-estado="pendiente"] { --color: #6d7f95; }
+.fecha { color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.ubicacion { margin-left: auto; color: var(--petroleo); font-weight: 650; }
+
+.foto {
+  margin-top: 12px; min-height: 160px; border-radius: var(--radio-m); overflow: hidden;
+  background: var(--fondo-suave); color: var(--texto-suave); font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.foto img { display: block; width: 100%; max-height: 420px; object-fit: contain; background: #1f251c; }
+
+.datos { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.datos li { padding: 4px 10px; border-radius: var(--radio-s); background: var(--fondo-suave); font-size: 14px; }
+.datos li.alerta { background: var(--lapacho-claro); color: #6b4f12; font-weight: 650; }
+
+.descripcion {
+  margin: 12px 0 0; padding: 8px 12px; border-left: 3px solid var(--borde);
+  color: var(--tinta); font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.nota { margin-top: 10px; }
+.nota summary { cursor: pointer; color: var(--petroleo); font-weight: 650; font-size: 15px; padding: 4px 0; }
+.nota summary small { font-weight: 500; color: var(--texto-suave); }
+.nota textarea {
+  display: block; width: 100%; margin-top: 6px; padding: 10px 12px; min-height: 44px; resize: vertical;
+  font: inherit; font-size: 15px; color: var(--tinta); border: 1.5px solid var(--borde); border-radius: var(--radio-m);
+}
+.nota textarea:focus-visible { outline: 3px solid var(--lapacho); outline-offset: 1px; }
+
+.acciones { margin-top: 12px; }
+.tarjeta[data-estado="pendiente"] .acciones-revisado,
+.tarjeta:not([data-estado="pendiente"]) .acciones-pendiente { display: none; }
+.con-foto { display: flex; align-items: center; gap: 8px; margin: 2px 0 10px; font-size: 15px; }
+.con-foto input { width: 18px; height: 18px; accent-color: var(--petroleo); }
+.acciones-revisado .btn-petroleo { margin-top: 12px; }
+.btn-lapacho, .btn-claro, .btn-petroleo { min-height: 46px; }
+
+.btn-quitar {
+  margin-top: 10px; padding: 6px 0; border: 0; background: none;
+  color: var(--rojo); font-weight: 650; text-decoration: underline; text-underline-offset: 3px;
+}
+.btn-quitar.confirmar { color: #fff; background: var(--rojo); padding: 8px 12px; border-radius: var(--radio-m); text-decoration: none; }
+
+@media (min-width: 760px) {
+  .panel { padding-top: 22px; }
+  .tarjeta { display: grid; grid-template-columns: 260px 1fr; gap: 0 16px; }
+  .tarjeta > * { grid-column: 2; }
+  .tarjeta > .foto { grid-column: 1; grid-row: 1 / span 6; margin-top: 0; align-self: start; }
+  .tarjeta:not(:has(> .foto:not([hidden]))) > * { grid-column: 1 / -1; }
+}

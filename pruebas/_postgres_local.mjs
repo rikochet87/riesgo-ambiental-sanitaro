@@ -9,13 +9,14 @@ export const conexion = {
   user: process.env.PGUSER || userInfo().username,
 };
 
-// Igual que en Vercel: una transacción, primero bajarse al rol anonymous
-export async function ejecutorLocal(consultas) {
+// Igual que en Vercel: una transacción, primero bajarse al rol pedido
+export async function ejecutorLocal(rol, consultas) {
+  if (!['anonymous', 'moderador'].includes(rol)) throw new Error(`Rol no permitido: ${rol}`);
   const c = new pg.Client(conexion);
   await c.connect();
   try {
     await c.query('begin');
-    await c.query('set local role anonymous');
+    await c.query(`set local role ${rol}`);
     const salida = [];
     for (const [texto, parametros] of consultas) salida.push((await c.query(texto, parametros)).rows);
     await c.query('commit');

@@ -19,14 +19,17 @@ En línea: https://riesgo-ambiental-sanitaro.vercel.app
 | `pruebas/` | Pruebas de `/api` y un servidor local que imita a Vercel |
 | `neon/schema.sql` | Tabla, permisos, reglas, topes, vista pública y fotos |
 | `neon/riesgo.sql` | Índice de riesgo y capas de contexto |
+| `neon/moderacion.sql` | Rol `moderador` y tope de intentos de entrada al panel |
+| `admin.html`, `admin.js`, `admin.css` | Panel de moderación (`/admin`) |
 | `scripts/` | Recortes de las capas al Gran Resistencia (ver `scripts/README.md`) |
 
 ## Puesta en marcha
 
-1. **Neon:** creá un proyecto. En el *SQL Editor* pegá y ejecutá `neon/schema.sql` y después `neon/riesgo.sql`. Si el rol `anonymous` no existe, el esquema lo crea.
+1. **Neon:** creá un proyecto. En el *SQL Editor* pegá y ejecutá, en este orden, `neon/schema.sql`, `neon/riesgo.sql` y `neon/moderacion.sql`. Los roles `anonymous` y `moderador` se crean solos si faltan.
 2. **Vercel:** importá el repositorio (*Add New > Project*). No lleva comando de build: Vercel publica los archivos y arma las funciones de `api/`.
-3. **Conexión:** en Neon, *Connect* → copiá la cadena de conexión (`postgresql://...`). En Vercel, *Settings > Environment Variables*, creá `DATABASE_URL` con ese valor y volvé a desplegar. Esa cadena lleva la contraseña: va solo ahí, nunca al repositorio ni a la página.
-4. Abrí la URL de Vercel desde el celular y probá un reporte.
+3. **Conexión:** en Neon, *Connect* → copiá la cadena de conexión (`postgresql://...`). En Vercel, *Settings > Environment Variables*, creá `DATABASE_URL` con ese valor. Esa cadena lleva la contraseña: va solo ahí, nunca al repositorio ni a la página.
+4. **Clave del panel:** en el mismo lugar creá `ADMIN_CLAVE`, de al menos 12 caracteres (mejor una frase larga). Volvé a desplegar para que tome las dos variables.
+5. Abrí la URL de Vercel desde el celular y probá un reporte.
 
 Cada `git push` a `main` vuelve a desplegar solo.
 
@@ -52,14 +55,24 @@ Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` car
 
 ## Moderar
 
-Desde el *SQL Editor* de Neon. Hay consultas listas al final de `neon/schema.sql`:
+Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la clave `ADMIN_CLAVE`. Está pensado para el celular:
 
-- Listar pendientes (sin traer las fotos, que pesan).
-- Ver una foto: exportarla en base64 y abrirla en el navegador como `data:image/jpeg;base64,<contenido>`.
-- Aprobar: `update ... set estado = 'verificado', foto_aprobada = true, revisado_en = now()`.
-- Estados (semáforo del mapa público): `verificado` = rojo, `en_gestion` = amarillo, `resuelto` = verde, `descartado` = no se muestra.
+- Pestañas por estado: pendientes, activos (rojo), en gestión (amarillo), resueltos (verde) y descartados.
+- Cada reporte muestra la foto (aunque no esté aprobada), los datos del relevamiento, la descripción y un enlace a su ubicación en Google Maps.
+- **Publicar** pasa un pendiente a activo, con o sin su foto. **Descartar** lo saca del circuito sin borrarlo.
+- En los ya revisados se cambia el estado y se publica o despublica la foto.
+- **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
+- Nota interna por reporte, que nunca se publica.
 
-La foto solo aparece en el mapa si marcás `foto_aprobada`. El estado y la foto se aprueban por separado: podés publicar un basural sin publicar su foto.
+Lo publicado puede tardar un par de minutos en verse en el mapa: la CDN de Vercel guarda la lista unos minutos.
+
+**Seguridad del panel:**
+- La sesión es una cookie firmada, válida 8 horas, que solo viaja a `/api/admin`, no la puede leer JavaScript y no se manda desde otros sitios. Cambiar `ADMIN_CLAVE` cierra todas las sesiones.
+- Con 10 claves incorrectas en 15 minutos se bloquea la entrada (incluso con la correcta) hasta que pasen.
+- Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes y cambiar estado, foto y nota, pero **no puede borrar reportes ni mover su ubicación**, aunque el código tuviera un error.
+- Lo que escribe el vecino se muestra siempre como texto, nunca como HTML.
+
+También se puede moderar desde el *SQL Editor* de Neon; hay consultas listas al final de `neon/schema.sql`.
 
 ## Índice de riesgo (popup de cada basural)
 

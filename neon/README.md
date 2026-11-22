@@ -26,6 +26,7 @@ esquema `auth` que creó la Data API: solo tiene funciones auxiliares, sin datos
 
 1. `schema.sql` (crea el rol `anonymous` si falta)
 2. `riesgo.sql`
+3. `moderacion.sql` (rol `moderador` del panel `/admin` y tope de intentos de entrada)
 
 ## Qué puede hacer el público
 

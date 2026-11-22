@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2f3d2c">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Moderación · Basurales en el Gran Resistencia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="temas/tema-monte.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin">
+  <header class="barra">
+    <div class="marca">
+      <svg class="marca-icono" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="#e64980"/>
+        <path d="M16 7c-3.6 0-6.5 2.8-6.5 6.4 0 4.9 6.5 11.6 6.5 11.6s6.5-6.7 6.5-11.6C22.5 9.8 19.6 7 16 7zm0 9a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z" fill="#fff"/>
+      </svg>
+      <div>
+        <h1>Moderación</h1>
+        <p>Basurales en el Gran Resistencia</p>
+      </div>
+    </div>
+    <button id="btn-salir" class="btn-barra" hidden>Salir</button>
+  </header>
+
+  <!-- Entrada -->
+  <main id="entrada" class="entrada" hidden>
+    <form id="form-entrada" class="caja-entrada" autocomplete="on">
+      <h2>Entrar al panel</h2>
+      <p class="suave">Solo para quien modera los reportes.</p>
+      <!-- El usuario fijo le permite al gestor de contraseñas recordar la clave -->
+      <input type="text" name="usuario" value="moderador" autocomplete="username" hidden>
+      <label class="campo">
+        <span>Clave</span>
+        <input type="password" name="clave" autocomplete="current-password" required minlength="12">
+      </label>
+      <p id="error-entrada" class="error" role="alert" hidden></p>
+      <button type="submit" id="btn-entrar" class="btn-lapacho ancho">Entrar</button>
+    </form>
+  </main>
+
+  <!-- Panel -->
+  <main id="panel" class="panel" hidden>
+    <nav class="filtros" aria-label="Estados">
+      <button data-estado="pendiente" aria-pressed="true">Pendientes <b data-n="pendiente">0</b></button>
+      <button data-estado="verificado" aria-pressed="false">Activos <b data-n="verificado">0</b></button>
+      <button data-estado="en_gestion" aria-pressed="false">En gestión <b data-n="en_gestion">0</b></button>
+      <button data-estado="resuelto" aria-pressed="false">Resueltos <b data-n="resuelto">0</b></button>
+      <button data-estado="descartado" aria-pressed="false">Descartados <b data-n="descartado">0</b></button>
+    </nav>
+    <p class="suave nota-mapa">Lo que publiques puede tardar un par de minutos en verse en el mapa.</p>
+    <div id="lista" class="lista" aria-live="polite"></div>
+    <p id="vacio" class="vacio" hidden></p>
+  </main>
+
+  <template id="plantilla-tarjeta">
+    <article class="tarjeta">
+      <header class="tarjeta-cab">
+        <span class="estado"></span>
+        <time class="fecha"></time>
+        <a class="ubicacion" target="_blank" rel="noopener noreferrer">Ver ubicación</a>
+      </header>
+      <div class="foto" hidden><span>Cargando foto…</span></div>
+      <ul class="datos"></ul>
+      <blockquote class="descripcion" hidden></blockquote>
+      <details class="nota">
+        <summary>Nota interna <small>(no se publica)</small></summary>
+        <textarea rows="2" maxlength="500" aria-label="Nota interna"></textarea>
+      </details>
+
+      <!-- Pendiente -->
+      <div class="acciones acciones-pendiente">
+        <label class="con-foto" hidden><input type="checkbox" checked> Publicar también la foto</label>
+        <div class="fila-botones">
+          <button class="btn-lapacho" data-accion="publicar">Publicar</button>
+          <button class="btn-claro" data-accion="descartar">Descartar</button>
+        </div>
+      </div>
+
+      <!-- Ya revisado -->
+      <div class="acciones acciones-revisado">
+        <label class="campo">
+          <span>Estado</span>
+          <select>
+            <option value="verificado">Activo (rojo)</option>
+            <option value="en_gestion">En gestión (amarillo)</option>
+            <option value="resuelto">Resuelto (verde)</option>
+            <option value="descartado">Descartado (no se muestra)</option>
+            <option value="pendiente">Volver a pendiente</option>
+          </select>
+        </label>
+        <label class="con-foto" hidden><input type="checkbox"> Foto publicada</label>
+        <button class="btn-petroleo ancho" data-accion="guardar">Guardar cambios</button>
+      </div>
+
+      <button class="btn-quitar" data-accion="quitar-foto" hidden>Quitar la foto</button>
+    </article>
+  </template>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

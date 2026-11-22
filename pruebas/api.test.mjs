@@ -160,7 +160,7 @@ test('una vez verificado: aparece en el mapa con fecha AAAA-MM-DD, y entrega fot
 });
 
 test('errores de la base que el trigger levanta a propósito', async () => {
-  usarEjecutorDePrueba(async () => {
+  usarEjecutorDePrueba(async (_rol) => {
     throw Object.assign(new Error('Se alcanzó el límite de reportes por hora. Probá más tarde.'), { code: 'P0001' });
   });
   try {
@@ -173,7 +173,7 @@ test('errores de la base que el trigger levanta a propósito', async () => {
 });
 
 test('un error inesperado no muestra detalles internos y es 5xx (el cliente reintenta)', async () => {
-  usarEjecutorDePrueba(async () => {
+  usarEjecutorDePrueba(async (_rol) => {
     throw Object.assign(new Error('connection to 10.0.0.3 refused, password=xyz'), { code: '08006' });
   });
   const original = console.error;

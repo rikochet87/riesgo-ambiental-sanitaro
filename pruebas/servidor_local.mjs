@@ -11,10 +11,16 @@ import { ejecutorLocal } from './_postgres_local.mjs';
 import * as reportes from '../api/reportes.js';
 import * as foto from '../api/foto.js';
 import * as riesgo from '../api/riesgo.js';
+import * as adminEntrar from '../api/admin/entrar.js';
+import * as adminReportes from '../api/admin/reportes.js';
+import * as adminFoto from '../api/admin/foto.js';
 
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 const PUERTO = Number(process.env.PORT || 8000);
-const FUNCIONES = { '/api/reportes': reportes, '/api/foto': foto, '/api/riesgo': riesgo };
+const FUNCIONES = {
+  '/api/reportes': reportes, '/api/foto': foto, '/api/riesgo': riesgo,
+  '/api/admin/entrar': adminEntrar, '/api/admin/reportes': adminReportes, '/api/admin/foto': adminFoto,
+};
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png',
@@ -50,7 +56,8 @@ http.createServer(async (req, res) => {
       return;
     }
 
-    const relativa = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).slice(1);
+    let relativa = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).slice(1);
+    if (!extname(relativa)) relativa += '.html';   // cleanUrls, como en Vercel: /admin → admin.html
     const ruta = normalize(join(RAIZ, relativa));
     if (!ruta.startsWith(RAIZ) || PRIVADO.test(relativa.split('/').join(sep))) {
       res.writeHead(404).end(); return;
