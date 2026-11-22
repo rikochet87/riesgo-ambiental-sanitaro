@@ -96,10 +96,10 @@ def html():
     return f'''<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <style>
-  @font-face {{ font-family: Archivo; src: url(fuentes/archivo-latin-wdth-normal.woff2) format('woff2-variations');
+  @font-face {{ font-family: Archivo; src: url(tipografia/archivo-latin-wdth-normal.woff2) format('woff2-variations');
                font-weight: 100 900; font-stretch: 62% 125%;
                unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F; }}
-  @font-face {{ font-family: Archivo; src: url(fuentes/archivo-latin-ext-wdth-normal.woff2) format('woff2-variations');
+  @font-face {{ font-family: Archivo; src: url(tipografia/archivo-latin-ext-wdth-normal.woff2) format('woff2-variations');
                font-weight: 100 900; font-stretch: 62% 125%; unicode-range: U+0100-024F, U+1E00-1EFF; }}
   * {{ box-sizing: border-box; }}
   body {{ margin: 0; width: {ANCHO}px; height: {ALTO}px; position: relative; overflow: hidden;
