@@ -1,0 +1,57 @@
+/* =====================================================================
+   Tema B: Monte chaqueño
+   Verdes de quebracho y monte, ocre suave de acento. Botones rectangulares
+   sin sombra, opciones como casillas. Se carga DESPUÉS de styles.css.
+   ===================================================================== */
+:root {
+  --petroleo: #2f3d2c;          /* verde quebracho (barra, selecciones) */
+  --petroleo-medio: #4a5d3f;
+  --petroleo-claro: #eef1e8;
+  --lapacho: #4f6b38;           /* acción principal: verde monte */
+  --lapacho-oscuro: #3d5429;
+  --lapacho-claro: #f6efdc;     /* alertas: ocre muy claro */
+  --tinta: #24291f;
+  --texto-suave: #646b5c;
+  --borde: #d6dacd;
+  --fondo-suave: #f4f5f0;
+
+  --rojo: #c0392b;
+  --ambar: #d9a43c;
+  --verde: #5b8c3a;
+
+  --radio-s: 6px;
+  --radio-m: 8px;
+  --radio-l: 14px;
+  --sombra-panel: 0 -1px 0 #d6dacd;
+}
+
+.barra { border-bottom: 3px solid #c9a24a; }
+.barra p { color: #cfd8c4; }
+.marca-icono circle { fill: #c9a24a; }
+.mira path { fill: #4f6b38; }
+
+/* Botones: rectangulares, planos */
+.btn-lapacho, .btn-petroleo, .btn-claro { border-radius: var(--radio-m); box-shadow: none; font-weight: 650; }
+.btn-lapacho { box-shadow: none; }
+.btn-lapacho:hover { background: var(--lapacho-oscuro); }
+.dock { border-top: 1px solid var(--borde); }
+
+/* Opciones como casillas: rectangulares, con marca a la izquierda */
+.chips span {
+  border-radius: var(--radio-s); padding-left: 34px; position: relative;
+  background: #fff; border-color: var(--borde);
+}
+.chips span::before {
+  content: ""; position: absolute; left: 11px; top: 50%; width: 14px; height: 14px;
+  transform: translateY(-50%); border-radius: 50%; border: 2px solid #a8b09b; background: #fff;
+}
+.chips input[type="checkbox"] + span::before { border-radius: 3px; }
+.chips input:checked + span { background: var(--petroleo-claro); border-color: var(--lapacho); color: var(--tinta); }
+.chips input:checked + span::before { border-color: var(--lapacho); background: var(--lapacho); box-shadow: inset 0 0 0 3px #fff; }
+.chips-alerta input:checked + span { background: var(--lapacho-claro); border-color: #c9a24a; color: #5c4710; }
+.chips-alerta input:checked + span::before { content: ""; margin: 0; border-color: #b8892b; background: #b8892b; }
+
+.btn-foto { border-style: solid; border-color: var(--borde); background: var(--fondo-suave); color: var(--petroleo); }
+.relevamiento summary span { color: var(--petroleo); }
+.pasos li::marker { color: #b8892b; }
+.rz-total { border-left-width: 4px; }

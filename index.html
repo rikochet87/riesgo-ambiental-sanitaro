@@ -3,128 +3,173 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f6f54">
+  <meta name="theme-color" content="#2f3d2c">
   <meta name="description" content="Denunciá y relevá basurales en el Gran Resistencia.">
-  <title>Basurales Gran Resistencia</title>
+  <title>Basurales en el Gran Resistencia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
+  <!-- Tema elegido: Monte chaqueño. Alternativa guardada: temas/tema-rio.css -->
+  <link rel="stylesheet" href="temas/tema-monte.css">
 </head>
 <body>
   <header class="barra">
-    <h1>Basurales <span>Gran Resistencia</span></h1>
-    <button id="btn-info" class="icono" aria-label="Información">?</button>
+    <div class="marca">
+      <svg class="marca-icono" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="#e64980"/>
+        <path d="M16 7c-3.6 0-6.5 2.8-6.5 6.4 0 4.9 6.5 11.6 6.5 11.6s6.5-6.7 6.5-11.6C22.5 9.8 19.6 7 16 7zm0 9a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2z" fill="#fff"/>
+      </svg>
+      <div>
+        <h1>Basurales</h1>
+        <p>Gran Resistencia</p>
+      </div>
+    </div>
+    <button id="btn-info" class="btn-icono" aria-label="Cómo funciona">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.5v6M12 7.2v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
   </header>
 
   <main id="mapa" aria-label="Mapa de basurales"></main>
 
-  <!-- Leyenda del semáforo -->
-  <div class="leyenda" aria-label="Referencias">
-    <span><i class="punto rojo"></i>Activo</span>
-    <span><i class="punto amarillo"></i>En gestión</span>
-    <span><i class="punto verde"></i>Resuelto</span>
-  </div>
-
-  <!-- Aviso de reportes esperando señal -->
+  <!-- Reportes guardados sin señal -->
   <div id="pendientes" class="pendientes" hidden></div>
 
-  <!-- Botón principal -->
-  <button id="btn-denunciar" class="btn-principal">+ Denunciar basural</button>
+  <!-- Panel inferior: semáforo + acción principal -->
+  <section class="dock" aria-label="Referencias y acción principal">
+    <ul class="semaforo" aria-label="Estado de los basurales en el mapa">
+      <li><i class="luz luz-rojo"></i>Activo</li>
+      <li><i class="luz luz-ambar"></i>En gestión</li>
+      <li><i class="luz luz-verde"></i>Resuelto</li>
+    </ul>
+    <button id="btn-denunciar" class="btn-lapacho">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+      Denunciar un basural
+    </button>
+  </section>
 
-  <!-- Modo elegir ubicación -->
+  <!-- Elegir ubicación -->
   <div id="mira" class="mira" hidden aria-hidden="true">
-    <svg viewBox="0 0 24 36" width="36" height="54"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="#d93025"/><circle cx="12" cy="12" r="4.5" fill="#fff"/></svg>
+    <svg viewBox="0 0 40 56" width="40" height="56">
+      <path d="M20 2C10 2 2 9.9 2 19.6 2 33 20 54 20 54s18-21 18-34.4C38 9.9 30 2 20 2z" fill="#e64980" stroke="#fff" stroke-width="3"/>
+      <circle cx="20" cy="20" r="6.5" fill="#fff"/>
+    </svg>
   </div>
   <div id="panel-ubicacion" class="panel-ubicacion" hidden>
-    <p>Mové el mapa hasta que el pin quede sobre el basural.</p>
+    <p class="panel-titulo">¿Dónde está el basural?</p>
+    <p class="panel-texto">Mové el mapa hasta que el pin quede encima.</p>
     <div class="fila-botones">
-      <button id="btn-gps" class="btn-secundario">Mi ubicación</button>
-      <button id="btn-cancelar-ubic" class="btn-secundario">Cancelar</button>
-      <button id="btn-confirmar-ubic" class="btn-primario">Confirmar</button>
+      <button id="btn-gps" class="btn-claro">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3.5M12 18.5V22M2 12h3.5M18.5 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Mi ubicación
+      </button>
+      <button id="btn-confirmar-ubic" class="btn-lapacho">Es acá</button>
     </div>
+    <button id="btn-cancelar-ubic" class="btn-texto">Cancelar</button>
   </div>
 
-  <!-- Formulario (hoja inferior) -->
+  <!-- Formulario -->
   <section id="hoja" class="hoja" hidden aria-labelledby="titulo-hoja">
     <form id="form" novalidate>
       <div class="hoja-cabecera">
-        <h2 id="titulo-hoja">Nuevo reporte</h2>
-        <button type="button" id="btn-cerrar" class="icono" aria-label="Cerrar">×</button>
+        <div>
+          <h2 id="titulo-hoja">Nuevo reporte</h2>
+          <p class="ubicacion-elegida" id="ubicacion-texto"></p>
+        </div>
+        <button type="button" id="btn-cerrar" class="btn-icono btn-icono-claro" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
       </div>
 
-      <p class="ubicacion-elegida" id="ubicacion-texto"></p>
-
       <label class="campo-foto">
-        <span>Foto (opcional)</span>
         <input type="file" id="foto" accept="image/*">
-        <span class="btn-foto" id="btn-foto-texto">Sacar o elegir foto</span>
+        <span class="btn-foto">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
+          <span id="btn-foto-texto">Sacar o elegir foto</span>
+          <small>opcional</small>
+        </span>
         <img id="foto-preview" alt="Vista previa de la foto" hidden>
       </label>
 
       <details class="relevamiento">
-        <summary>Relevamiento (opcional)</summary>
+        <summary>
+          <span>Sumar datos del lugar</span>
+          <small>Opcional, ayuda a priorizar</small>
+        </summary>
 
-        <label>Tipo de residuo
-          <select name="tipo">
-            <option value="">No sé</option>
-            <option value="domiciliario">Domiciliario (bolsas, restos)</option>
-            <option value="verde_poda">Verde / poda</option>
-            <option value="escombros">Escombros</option>
-            <option value="neumaticos">Neumáticos</option>
-            <option value="mixto">Mezcla</option>
-            <option value="otro">Otro</option>
-          </select>
-        </label>
-
-        <label>Tamaño aproximado
-          <select name="tamano">
-            <option value="">No sé</option>
-            <option value="bolsas">Unas bolsas</option>
-            <option value="carretilla">Una carretilla</option>
-            <option value="camioneta">Una camioneta</option>
-            <option value="camion_o_mas">Un camión o más</option>
-          </select>
-        </label>
-
-        <label>¿Hace cuánto está?
-          <select name="antiguedad">
-            <option value="">No sé</option>
-            <option value="dias">Días</option>
-            <option value="semanas">Semanas</option>
-            <option value="meses">Meses</option>
-            <option value="mas_de_un_anio">Más de un año</option>
-          </select>
-        </label>
-
-        <fieldset class="checks">
-          <legend>Marcá lo que corresponda</legend>
-          <label><input type="checkbox" name="quema"> Lo queman o hay restos de quema</label>
-          <label><input type="checkbox" name="cerca_agua"> Está cerca de un canal, laguna o zanja</label>
-          <label><input type="checkbox" name="cerca_escuela"> Está cerca de una escuela o centro de salud</label>
+        <fieldset class="grupo">
+          <legend>¿Qué tipo de residuo?</legend>
+          <div class="chips">
+            <label><input type="radio" name="tipo" value="domiciliario"><span>Domiciliario</span></label>
+            <label><input type="radio" name="tipo" value="verde_poda"><span>Poda</span></label>
+            <label><input type="radio" name="tipo" value="escombros"><span>Escombros</span></label>
+            <label><input type="radio" name="tipo" value="neumaticos"><span>Neumáticos</span></label>
+            <label><input type="radio" name="tipo" value="mixto"><span>Mezcla</span></label>
+            <label><input type="radio" name="tipo" value="otro"><span>Otro</span></label>
+          </div>
         </fieldset>
 
-        <label>Comentario
-          <textarea name="descripcion" maxlength="500" rows="3"
-            placeholder="Referencia del lugar, sin datos personales"></textarea>
+        <fieldset class="grupo">
+          <legend>¿Qué tamaño tiene?</legend>
+          <div class="chips chips-escala">
+            <label><input type="radio" name="tamano" value="bolsas"><span>Unas bolsas</span></label>
+            <label><input type="radio" name="tamano" value="carretilla"><span>Una carretilla</span></label>
+            <label><input type="radio" name="tamano" value="camioneta"><span>Una camioneta</span></label>
+            <label><input type="radio" name="tamano" value="camion_o_mas"><span>Un camión o más</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="grupo">
+          <legend>¿Hace cuánto está?</legend>
+          <div class="chips">
+            <label><input type="radio" name="antiguedad" value="dias"><span>Días</span></label>
+            <label><input type="radio" name="antiguedad" value="semanas"><span>Semanas</span></label>
+            <label><input type="radio" name="antiguedad" value="meses"><span>Meses</span></label>
+            <label><input type="radio" name="antiguedad" value="mas_de_un_anio"><span>Más de un año</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="grupo">
+          <legend>¿Qué hay cerca?</legend>
+          <div class="chips chips-alerta">
+            <label><input type="checkbox" name="quema"><span>Lo queman</span></label>
+            <label><input type="checkbox" name="cerca_agua"><span>Canal, laguna o zanja</span></label>
+            <label><input type="checkbox" name="cerca_escuela"><span>Escuela o centro de salud</span></label>
+          </div>
+        </fieldset>
+
+        <label class="grupo">
+          <span class="grupo-titulo">Referencia del lugar</span>
+          <textarea name="descripcion" maxlength="500" rows="2"
+            placeholder="Ej.: esquina del canal, detrás de la cancha"></textarea>
         </label>
       </details>
 
       <!-- Campo trampa para bots: las personas no lo ven -->
       <input type="text" name="sitio_web" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
 
-      <p class="aviso-privacidad">No pedimos tu nombre ni guardamos quién reporta. Las fotos se revisan antes de usarse.</p>
-
-      <button type="submit" id="btn-enviar" class="btn-primario ancho">Enviar reporte</button>
+      <button type="submit" id="btn-enviar" class="btn-lapacho ancho">Enviar reporte</button>
+      <p class="aviso-privacidad">No pedimos tu nombre ni guardamos quién reporta. Las fotos se revisan antes de mostrarse.</p>
     </form>
   </section>
 
-  <!-- Información -->
+  <!-- Cómo funciona -->
   <dialog id="dlg-info">
-    <h2>¿Cómo funciona?</h2>
-    <p>Tocá <b>Denunciar basural</b>, ubicá el pin y enviá. Si querés, sumá una foto y completá el relevamiento.</p>
-    <p>Los reportes se revisan antes de aparecer en el mapa. Los colores indican el estado: rojo activo, amarillo en gestión, verde resuelto.</p>
-    <p>Si no tenés señal, el reporte queda guardado en tu celular y se envía solo la próxima vez que abras la página con conexión.</p>
-    <form method="dialog"><button class="btn-primario ancho">Entendido</button></form>
+    <h2>Cómo funciona</h2>
+    <ol class="pasos">
+      <li><b>Denunciá.</b> Tocá el botón verde y ubicá el pin sobre el basural.</li>
+      <li><b>Sumá datos si podés.</b> Una foto y unos pocos datos ayudan a priorizar.</li>
+      <li><b>Seguilo en el mapa.</b> Después de revisarlo aparece con su color.</li>
+    </ol>
+    <ul class="semaforo semaforo-dialogo">
+      <li><i class="luz luz-rojo"></i>Activo</li>
+      <li><i class="luz luz-ambar"></i>En gestión</li>
+      <li><i class="luz luz-verde"></i>Resuelto</li>
+    </ul>
+    <p class="dialogo-nota">Tocá un punto del mapa para ver su riesgo ambiental y sanitario. Sin señal, el reporte se guarda en tu celular y se envía solo al volver la conexión.</p>
+    <form method="dialog"><button class="btn-petroleo ancho">Entendido</button></form>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

@@ -1,18 +1,42 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, AREA, CENTRO_INICIAL, ZOOM_INICIAL } from './config.js';
+import { NEON_DATA_API, AREA, CENTRO_INICIAL, ZOOM_INICIAL } from './config.js';
 
 // ---------------------------------------------------------------------
-// Configuración
+// Data API de Neon (compatible con PostgREST)
 // ---------------------------------------------------------------------
-const CONFIGURADO = !SUPABASE_URL.includes('TU-PROYECTO') && !SUPABASE_ANON_KEY.includes('TU-CLAVE');
-const sb = CONFIGURADO
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
-  : null;
+// Sin librerías ni claves: el rol anonymous solo puede insertar reportes,
+// leer la vista pública y llamar a las dos funciones. Lo permite la base.
+const CONFIGURADO = !NEON_DATA_API.includes('TU-PROYECTO');
+const API = NEON_DATA_API.replace(/\/+$/, '');
 
-const FOTO_LADO_MAX = 1280;      // px
-const FOTO_PESO_OBJETIVO = 300_000; // bytes
+async function api(ruta, opciones = {}) {
+  if (!CONFIGURADO) {
+    throw Object.assign(new Error('La página todavía no está conectada a la base.'), { code: 'SIN_CONFIG' });
+  }
+  const res = await fetch(API + ruta, {
+    ...opciones,
+    headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) },
+  });
+  if (!res.ok) {
+    let cuerpo = {};
+    try { cuerpo = await res.json(); } catch { /* la respuesta no trae JSON */ }
+    throw Object.assign(new Error(cuerpo.message || `Error ${res.status}`),
+                        { code: cuerpo.code, status: res.status });
+  }
+  if (res.status === 204) return null;
+  const texto = await res.text();
+  return texto ? JSON.parse(texto) : null;
+}
 
-const COLORES = { verificado: '#d93025', en_gestion: '#f2a900', resuelto: '#1e8e3e' };
+const apiSelect = (vista, consulta) => api(`/${vista}?${consulta}`);
+const apiInsert = (tabla, fila) =>
+  api(`/${tabla}`, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(fila) });
+const apiRpc = (funcion, args) =>
+  api(`/rpc/${funcion}`, { method: 'POST', body: JSON.stringify(args) });
+
+const FOTO_LADO_MAX = 1000;      // px
+const FOTO_PESO_OBJETIVO = 200_000; // bytes (la foto viaja dentro del reporte)
+
+const COLORES = { verificado: '#e03131', en_gestion: '#f59f00', resuelto: '#2f9e44' };
 const NOMBRES_ESTADO = { verificado: 'Activo', en_gestion: 'En gestión', resuelto: 'Resuelto' };
 const NOMBRES_TIPO = {
   domiciliario: 'Domiciliario', verde_poda: 'Verde / poda', escombros: 'Escombros',
@@ -24,12 +48,14 @@ const $ = (id) => document.getElementById(id);
 // ---------------------------------------------------------------------
 // Mapa
 // ---------------------------------------------------------------------
-const mapa = L.map('mapa', { zoomControl: false }).setView(CENTRO_INICIAL, ZOOM_INICIAL);
-L.control.zoom({ position: 'bottomright' }).addTo(mapa);
-
-const calles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap',
+const mapa = L.map('mapa', { zoomControl: false, attributionControl: false }).setView(CENTRO_INICIAL, ZOOM_INICIAL);
+// Créditos arriba a la izquierda: abajo los tapa el panel del botón
+L.control.attribution({ position: 'topleft', prefix: false }).addTo(mapa);
+// Mapa base claro y de pocos colores, para que resalten los puntos del semáforo
+const calles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  maxZoom: 20,
+  subdomains: 'abcd',
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
 }).addTo(mapa);
 
 const satelite = L.tileLayer(
@@ -37,7 +63,8 @@ const satelite = L.tileLayer(
   { maxZoom: 19, attribution: 'Imágenes &copy; Esri' },
 );
 
-L.control.layers({ 'Calles': calles, 'Satélite': satelite }, null, { position: 'topright' }).addTo(mapa);
+L.control.layers({ 'Mapa': calles, 'Satélite': satelite }, null, { position: 'topright' }).addTo(mapa);
+L.control.zoom({ position: 'topright' }).addTo(mapa);
 
 // La mira va dentro del contenedor del mapa para que su centro sea exacto
 mapa.getContainer().appendChild($('mira'));
@@ -45,21 +72,21 @@ mapa.getContainer().appendChild($('mira'));
 const capaPublica = L.layerGroup().addTo(mapa);
 
 async function cargarReportesPublicos() {
-  if (!sb) return;
-  const { data, error } = await sb
-    .from('reportes_publicos')
-    .select('id, lat, lon, estado, tipo, tamano, quema, fecha')
-    .limit(3000);
-  if (error) { console.warn('No se pudo cargar el mapa público', error); return; }
+  if (!CONFIGURADO) return;
+  let data;
+  try {
+    data = await apiSelect('reportes_publicos',
+      'select=id,lat,lon,estado,tipo,tamano,quema,fecha,tiene_foto&limit=3000');
+  } catch (err) { console.warn('No se pudo cargar el mapa público', err); return; }
 
   capaPublica.clearLayers();
   for (const r of data) {
     const color = COLORES[r.estado] || '#888';
     const marcador = L.circleMarker([r.lat, r.lon], {
-      radius: 9, color: '#fff', weight: 2, fillColor: color, fillOpacity: 0.95,
+      radius: 10, color: '#fff', weight: 3, fillColor: color, fillOpacity: 1,
     });
     marcador.bindPopup(htmlPopup(r, null), { maxWidth: 300, minWidth: 260, autoPanPadding: [16, 70] });
-    marcador.on('popupopen', () => cargarRiesgo(marcador, r));
+    marcador.on('popupopen', async () => { await cargarRiesgo(marcador, r); cargarFoto(marcador, r); });
     marcador.addTo(capaPublica);
   }
 }
@@ -68,14 +95,39 @@ async function cargarReportesPublicos() {
 // Popup con índice de riesgo
 // ---------------------------------------------------------------------
 const cacheRiesgo = new Map();
-const COLOR_CLASE = { bajo: '#1e8e3e', medio: '#f2a900', alto: '#d93025' };
+const cacheFoto = new Map();
+const COLOR_CLASE = { bajo: '#2f9e44', medio: '#e8590c', alto: '#e03131' };
 
 async function cargarRiesgo(marcador, r) {
   if (cacheRiesgo.has(r.id)) { marcador.setPopupContent(htmlPopup(r, cacheRiesgo.get(r.id))); return; }
-  const { data, error } = await sb.rpc('riesgo_basural', { p_id: r.id });
-  const riesgo = error ? { error: true } : (data || { error: true });
-  if (!error) cacheRiesgo.set(r.id, riesgo);
+  let riesgo;
+  try {
+    riesgo = (await apiRpc('riesgo_basural', { p_id: r.id })) || { error: true };
+    if (!riesgo.error) cacheRiesgo.set(r.id, riesgo);
+  } catch (err) { console.warn('No se pudo calcular el índice', err); riesgo = { error: true }; }
   marcador.setPopupContent(htmlPopup(r, riesgo));
+}
+
+// La foto se pide aparte y solo al abrir el popup, para no cargarla en el mapa
+async function cargarFoto(marcador, r) {
+  if (!r.tiene_foto) return;
+  const hueco = marcador.getPopup()?.getElement()?.querySelector('.rz-foto');
+  if (!hueco) return;
+  try {
+    let base64 = cacheFoto.get(r.id);
+    if (base64 === undefined) {
+      base64 = await apiRpc('foto_basural', { p_id: r.id });
+      cacheFoto.set(r.id, base64);
+    }
+    if (!base64) { hueco.remove(); return; }
+    const img = new Image();
+    img.alt = 'Foto del basural enviada por un vecino';
+    img.src = `data:image/jpeg;base64,${base64}`;
+    hueco.replaceChildren(img);
+  } catch (err) {
+    console.warn('No se pudo cargar la foto', err);
+    hueco.textContent = 'No se pudo cargar la foto.';
+  }
 }
 
 const fmt = (n) => Number(n).toLocaleString('es-AR');
@@ -83,7 +135,7 @@ const fmt = (n) => Number(n).toLocaleString('es-AR');
 function barra(nombre, puntaje, peso, detalle) {
   const sinDatos = puntaje === null || puntaje === undefined;
   const pct = sinDatos ? 0 : Math.round(puntaje * 100);
-  const color = sinDatos ? '#b4b2a9' : pct >= 67 ? '#d93025' : pct >= 34 ? '#f2a900' : '#1e8e3e';
+  const color = sinDatos ? '#b8c4c6' : pct >= 67 ? '#e03131' : pct >= 34 ? '#f59f00' : '#2f9e44';
   return `
     <div class="rz-comp">
       <div class="rz-fila"><span>${nombre}</span><b>${sinDatos ? 'sin datos' : pct}</b></div>
@@ -93,15 +145,19 @@ function barra(nombre, puntaje, peso, detalle) {
 }
 
 function htmlPopup(r, riesgo) {
+  const fecha = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-AR');
+  const tipo = r.tipo ? `${NOMBRES_TIPO[r.tipo] || r.tipo}, reportado el ${fecha}` : `Reportado el ${fecha}`;
   const cabecera = `
     <div class="rz-cab">
-      <b>${NOMBRES_ESTADO[r.estado] || r.estado}</b>
-      <span>${r.tipo ? (NOMBRES_TIPO[r.tipo] || r.tipo) + ' · ' : ''}reportado el
-      ${new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-AR')}</span>
+      <b><i class="luz" style="display:inline-block;margin-right:7px;vertical-align:1px;background:${COLORES[r.estado] || '#888'}"></i>${NOMBRES_ESTADO[r.estado] || r.estado}</b>
+      <span>${tipo}</span>
     </div>`;
 
-  if (!riesgo) return `<div class="rz">${cabecera}<p class="rz-cargando">Calculando índice de riesgo…</p></div>`;
-  if (riesgo.error) return `<div class="rz">${cabecera}<p class="rz-cargando">No se pudo calcular el índice ahora.</p></div>`;
+  // Hueco para la foto: lo completa cargarFoto() cuando llega la imagen
+  const foto = r.tiene_foto ? '<div class="rz-foto">Cargando foto…</div>' : '';
+
+  if (!riesgo) return `<div class="rz">${cabecera}${foto}<p class="rz-cargando">Calculando índice de riesgo…</p></div>`;
+  if (riesgo.error) return `<div class="rz">${cabecera}${foto}<p class="rz-cargando">No se pudo calcular el índice ahora.</p></div>`;
 
   const a = riesgo.amenaza, e = riesgo.exposicion, v = riesgo.vulnerabilidad, rv = riesgo.reportes, w = riesgo.pesos;
 
@@ -135,9 +191,10 @@ function htmlPopup(r, riesgo) {
   return `
     <div class="rz">
       ${cabecera}
+      ${foto}
       <div class="rz-total" style="border-color:${colorClase}">
         <span class="rz-num" style="color:${colorClase}">${riesgo.total ?? '–'}</span>
-        <span>Riesgo ambiental y sanitario<br><b style="color:${colorClase}">${clase.toUpperCase()}</b> <small>(0–100)</small></span>
+        <span>Índice ambiental y sanitario<br><b style="color:${colorClase}">Riesgo ${clase}</b> <small>sobre 100</small></span>
       </div>
       ${barra('Amenaza', a.puntaje, w.amenaza, detAmenaza)}
       ${barra('Exposición', e.puntaje, w.exposicion, detExpo)}
@@ -250,7 +307,15 @@ async function comprimirFoto(file) {
     calidad -= 0.15;
   } while (blob && blob.size > FOTO_PESO_OBJETIVO && calidad > 0.3);
   if (!blob) throw new Error('No se pudo procesar la foto');
-  return blob;
+
+  // La foto viaja dentro del reporte, en base64: así la guarda la base
+  const base64 = await new Promise((ok, mal) => {
+    const lector = new FileReader();
+    lector.onload = () => ok(String(lector.result).split(',')[1]);
+    lector.onerror = () => mal(lector.error);
+    lector.readAsDataURL(blob);
+  });
+  return { blob, base64 };
 }
 
 async function alElegirFoto(e) {
@@ -259,8 +324,9 @@ async function alElegirFoto(e) {
   $('foto-preview').hidden = true;
   if (!file) return;
   try {
-    fotoProcesada = await comprimirFoto(file);
-    $('foto-preview').src = URL.createObjectURL(fotoProcesada);
+    const procesada = await comprimirFoto(file);
+    fotoProcesada = procesada.base64;
+    $('foto-preview').src = URL.createObjectURL(procesada.blob);
     $('foto-preview').hidden = false;
     $('btn-foto-texto').textContent = 'Cambiar foto';
   } catch (err) {
@@ -306,29 +372,24 @@ function esErrorDeRed(err) {
 }
 
 function yaExiste(err) {
-  // 23505: el reporte ya está en la base (reintento). 409: la foto ya se subió.
+  // 23505: el reporte ya está en la base (reintento tras un envío que sí llegó)
   if (!err) return false;
-  return err.code === '23505' || String(err.statusCode) === '409' ||
+  return err.code === '23505' || err.status === 409 ||
     /already exists|duplicate/i.test(err.message || '');
 }
 
 async function enviarReporte(rep) {
-  if (!sb) throw Object.assign(new Error('La página todavía no está conectada a la base.'), { code: 'SIN_CONFIG' });
-
-  if (rep.foto) {
-    const { error } = await sb.storage
-      .from('fotos')
-      .upload(rep.datos.foto_path, rep.foto, { contentType: 'image/jpeg', upsert: false });
-    if (error && !yaExiste(error)) throw error;
+  try {
+    await apiInsert('reportes', rep.datos);
+  } catch (err) {
+    if (!yaExiste(err)) throw err;
   }
-
-  const { error } = await sb.from('reportes').insert(rep.datos);
-  if (error && !yaExiste(error)) throw error;
 }
 
 function mensajeDeError(err) {
   if (!err) return 'No se pudo enviar el reporte.';
-  if (err.code === 'P0001' || err.code === 'P0002' || err.code === 'SIN_CONFIG') return err.message;
+  // P0001 tope por hora · P0002 duplicado cercano · P0003 foto inválida
+  if (['P0001', 'P0002', 'P0003', 'SIN_CONFIG'].includes(err.code)) return err.message;
   if (err.code === '23514') return 'Algún dato no es válido. Revisá la ubicación y los campos.';
   return 'No se pudo enviar el reporte. Probá de nuevo en un rato.';
 }
@@ -354,9 +415,9 @@ async function alEnviar(e) {
     cerca_agua: form.cerca_agua.checked || null,
     cerca_escuela: form.cerca_escuela.checked || null,
     descripcion: form.descripcion.value.trim().slice(0, 500) || null,
-    foto_path: fotoProcesada ? `reportes/${id}.jpg` : null,
+    foto_entrada: fotoProcesada,   // base64; la base la convierte y la vacía
   };
-  const rep = { id, datos, foto: fotoProcesada, guardado_en: Date.now() };
+  const rep = { id, datos, guardado_en: Date.now() };
 
   btn.disabled = true; btn.textContent = 'Enviando…';
   try {
@@ -380,7 +441,7 @@ async function alEnviar(e) {
 
 let reintentando = false;
 async function reintentarPendientes() {
-  if (reintentando || !sb || !navigator.onLine) return;
+  if (reintentando || !CONFIGURADO || !navigator.onLine) return;
   reintentando = true;
   try {
     const pendientes = await listarCola();
@@ -439,7 +500,7 @@ $('btn-info').addEventListener('click', () => $('dlg-info').showModal());
 window.addEventListener('online', reintentarPendientes);
 
 if (!CONFIGURADO) {
-  console.warn('Completá config.js con la URL y la clave anon de Supabase.');
+  console.warn('Completá config.js con la URL de la Data API de tu proyecto de Neon.');
 }
 
 cargarReportesPublicos();

@@ -1,0 +1,55 @@
+/* =====================================================================
+   Tema C: Río Negro
+   Azul pizarra con verde agua apagado. Botones tipo píldora con borde,
+   livianos; tipografía Public Sans. Se carga DESPUÉS de styles.css.
+   ===================================================================== */
+:root {
+  --petroleo: #253b52;          /* azul pizarra (barra, selecciones) */
+  --petroleo-medio: #3d5873;
+  --petroleo-claro: #e9eff5;
+  --lapacho: #2c7a7b;           /* acción principal: verde agua apagado */
+  --lapacho-oscuro: #22615f;
+  --lapacho-claro: #e6f2f1;
+  --tinta: #1c2733;
+  --texto-suave: #5c6b7a;
+  --borde: #d5dde5;
+  --fondo-suave: #f4f7fa;
+
+  --rojo: #d64545;
+  --ambar: #e3a23b;
+  --verde: #3f9a6b;
+
+  --radio-s: 999px;
+  --radio-m: 999px;
+  --radio-l: 18px;
+  --fuente: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.barra { background: #fff; color: var(--tinta); border-bottom: 1px solid var(--borde); }
+.barra h1 { font-stretch: 100%; font-weight: 750; }
+.barra p { color: var(--texto-suave); }
+.btn-icono { border-color: var(--borde); color: var(--petroleo); }
+.marca-icono circle { fill: var(--petroleo); }
+.mira path { fill: var(--lapacho); }
+
+/* Botones: píldora; principal relleno, secundarios con borde */
+.btn-lapacho { box-shadow: none; font-weight: 650; }
+.dock .btn-lapacho { font-stretch: 100%; }
+.btn-claro { border: 1.5px solid var(--petroleo); color: var(--petroleo); font-weight: 600; }
+.btn-petroleo { font-weight: 600; }
+
+/* Opciones: píldoras con borde; la elegida se rellena suave y lleva borde del color */
+.chips span { border-radius: 999px; font-weight: 500; }
+.chips input:checked + span { background: var(--petroleo-claro); border-color: var(--petroleo); color: var(--petroleo); font-weight: 650; box-shadow: inset 0 0 0 1px var(--petroleo); }
+.chips-alerta input:checked + span { background: #fdf1ec; border-color: #c4572f; color: #9a3d1d; box-shadow: inset 0 0 0 1px #c4572f; }
+
+.hoja h2, .panel-titulo, dialog h2, .rz-cab b, .rz-num { font-stretch: 100%; }
+.btn-foto { border-radius: 14px; border-style: solid; border-color: var(--borde); background: var(--fondo-suave); }
+.relevamiento, textarea, #foto-preview { border-radius: 14px; }
+.rz-total { border-radius: 0 10px 10px 0; }
+.toast { border-radius: 14px; }
+
+/* Paneles y controles del mapa: esquinas normales (las píldoras son solo para botones y opciones) */
+.leaflet-popup-content-wrapper { border-radius: 16px; }
+.leaflet-control-layers, .leaflet-bar { border-radius: 12px !important; }
+.pendientes { border-radius: 999px; }

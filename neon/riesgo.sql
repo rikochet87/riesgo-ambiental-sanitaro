@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Basurales Gran Resistencia — índice de riesgo ambiental y sanitario (v2)
--- Ejecutar DESPUÉS de schema.sql, en Supabase > SQL Editor.
+-- Ejecutar DESPUÉS de schema.sql, en el SQL Editor de Neon.
 --
 -- Riesgo (0–100) = promedio ponderado de cuatro componentes (0–1):
 --   1. Amenaza ............ tamaño, quemas y crecimiento (satélite; si no hay,
@@ -21,13 +21,13 @@
 create table if not exists public.capa_escuelas (
   id      bigserial primary key,
   nombre  text,
-  geom    extensions.geometry(Point, 4326) not null
+  geom    gis.geometry(Point, 4326) not null
 );
 
 create table if not exists public.capa_salud (
   id      bigserial primary key,
   nombre  text,
-  geom    extensions.geometry(Point, 4326) not null
+  geom    gis.geometry(Point, 4326) not null
 );
 
 -- Lagunas (polígonos), ríos y canales (líneas)
@@ -37,7 +37,7 @@ create table if not exists public.capa_agua (
   tipo    text,            -- laguna, rio, canal, riacho...
   regimen text,            -- perenne / intermitente
   capa    text,            -- capa de origen (IGN)
-  geom    extensions.geometry(Geometry, 4326) not null
+  geom    gis.geometry(Geometry, 4326) not null
 );
 -- Si la tabla ya existía de una versión anterior:
 alter table public.capa_agua add column if not exists regimen text;
@@ -46,7 +46,7 @@ alter table public.capa_agua add column if not exists capa text;
 create table if not exists public.capa_inundable (
   id      bigserial primary key,
   nivel   text,            -- p. ej. alto / medio, según la fuente
-  geom    extensions.geometry(Geometry, 4326) not null
+  geom    gis.geometry(Geometry, 4326) not null
 );
 
 -- Radios censales con población y viviendas
@@ -55,7 +55,7 @@ create table if not exists public.capa_poblacion (
   codigo     text,
   poblacion  integer not null,
   viviendas  integer,
-  geom       extensions.geometry(Geometry, 4326) not null
+  geom       gis.geometry(Geometry, 4326) not null
 );
 
 create index if not exists capa_escuelas_geom_idx  on public.capa_escuelas  using gist (geom);
@@ -76,7 +76,7 @@ create table if not exists public.amenaza_satelital (
 );
 
 -- ---------------------------------------------------------------------
--- 3. Parámetros (una sola fila; se editan desde el Table Editor)
+-- 3. Parámetros (una sola fila; se editan desde Tables o el SQL Editor)
 -- ---------------------------------------------------------------------
 create table if not exists public.parametros_riesgo (
   id                     boolean primary key default true check (id),
@@ -102,7 +102,7 @@ insert into public.parametros_riesgo (id) values (true) on conflict (id) do noth
 revoke all on public.capa_escuelas, public.capa_salud, public.capa_agua,
               public.capa_inundable, public.capa_poblacion,
               public.amenaza_satelital, public.parametros_riesgo
-  from anon, authenticated;
+  from anonymous, authenticated;
 alter table public.capa_escuelas     enable row level security;
 alter table public.capa_salud        enable row level security;
 alter table public.capa_agua         enable row level security;
@@ -141,8 +141,8 @@ declare
   r   public.reportes;
   p   public.parametros_riesgo;
   s   public.amenaza_satelital;
-  pt  extensions.geography;
-  buf extensions.geometry;
+  pt  gis.geography;
+  buf gis.geometry;
 
   -- amenaza
   fuente text;  a_tam numeric;  a_que numeric;  a_cre numeric;  amenaza numeric;
@@ -162,8 +162,8 @@ begin
   if not found then return null; end if;
 
   select * into p from public.parametros_riesgo limit 1;
-  pt  := r.geom::extensions.geography;
-  buf := extensions.st_buffer(pt, p.radio_exposicion_m)::extensions.geometry;
+  pt  := r.geom::gis.geography;
+  buf := gis.st_buffer(pt, p.radio_exposicion_m)::gis.geometry;
 
   -- ---------------- 1. Amenaza ----------------
   select * into s from public.amenaza_satelital where reporte_id = p_id;
@@ -186,23 +186,23 @@ begin
   -- ---------------- 2. Exposición ----------------
   if exists (select 1 from public.capa_poblacion) then
     -- población del radio censal proporcional al área dentro del buffer
-    select coalesce(sum(c.poblacion * extensions.st_area(extensions.st_intersection(c.geom, buf)::extensions.geography)
-                        / nullif(extensions.st_area(c.geom::extensions.geography), 0)), 0),
-           coalesce(sum(coalesce(c.viviendas, 0) * extensions.st_area(extensions.st_intersection(c.geom, buf)::extensions.geography)
-                        / nullif(extensions.st_area(c.geom::extensions.geography), 0)), 0)
+    select coalesce(sum(c.poblacion * gis.st_area(gis.st_intersection(c.geom, buf)::gis.geography)
+                        / nullif(gis.st_area(c.geom::gis.geography), 0)), 0),
+           coalesce(sum(coalesce(c.viviendas, 0) * gis.st_area(gis.st_intersection(c.geom, buf)::gis.geography)
+                        / nullif(gis.st_area(c.geom::gis.geography), 0)), 0)
       into pob, viv
     from public.capa_poblacion c
-    where extensions.st_intersects(c.geom, buf);
+    where gis.st_intersects(c.geom, buf);
   end if;
 
   if exists (select 1 from public.capa_escuelas) then
     select count(*) into n_esc from public.capa_escuelas e
-    where extensions.st_dwithin(e.geom::extensions.geography, pt, p.radio_exposicion_m);
+    where gis.st_dwithin(e.geom::gis.geography, pt, p.radio_exposicion_m);
   end if;
 
   if exists (select 1 from public.capa_salud) then
     select count(*) into n_sal from public.capa_salud h
-    where extensions.st_dwithin(h.geom::extensions.geography, pt, p.radio_exposicion_m);
+    where gis.st_dwithin(h.geom::gis.geography, pt, p.radio_exposicion_m);
   end if;
 
   -- Ojo: least(null, 1) devuelve 1 en PostgreSQL, por eso el "case" explícito
@@ -214,11 +214,11 @@ begin
 
   -- ---------------- 3. Vulnerabilidad ambiental ----------------
   if exists (select 1 from public.capa_agua) then
-    select extensions.st_distance(a.geom::extensions.geography, pt), a.nombre, a.tipo
+    select gis.st_distance(a.geom::gis.geography, pt), a.nombre, a.tipo
       into d_agua, agua_nombre, agua_tipo
     from public.capa_agua a
-    where extensions.st_dwithin(a.geom::extensions.geography, pt, p.radio_agua_m)
-    order by extensions.st_distance(a.geom::extensions.geography, pt)
+    where gis.st_dwithin(a.geom::gis.geography, pt, p.radio_agua_m)
+    order by gis.st_distance(a.geom::gis.geography, pt)
     limit 1;
     -- 1 hasta 50 m, baja lineal hasta 0 en el radio máximo
     s_agua := case when d_agua is null then 0
@@ -227,7 +227,7 @@ begin
 
   if exists (select 1 from public.capa_inundable) then
     en_inundable := exists (select 1 from public.capa_inundable z
-                            where extensions.st_intersects(z.geom, r.geom));
+                            where gis.st_intersects(z.geom, r.geom));
     s_inund := case when en_inundable then 1 else 0 end;
   end if;
 
@@ -239,7 +239,7 @@ begin
     into n_rep, dias
   from public.reportes x
   where x.estado = 'verificado'
-    and extensions.st_dwithin(x.geom::extensions.geography, pt, p.radio_reportes_m);
+    and gis.st_dwithin(x.geom::gis.geography, pt, p.radio_reportes_m);
 
   reportes_s := 0.5 * least(n_rep::numeric / p.reportes_max, 1)
               + 0.5 * least(dias::numeric / p.dias_persistencia_max, 1);
@@ -279,7 +279,7 @@ end;
 $$;
 
 revoke all on function public.riesgo_basural(uuid) from public;
-grant execute on function public.riesgo_basural(uuid) to anon;
+grant execute on function public.riesgo_basural(uuid) to anonymous;
 
 -- =====================================================================
 -- Prueba manual:

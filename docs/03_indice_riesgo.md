@@ -1,6 +1,6 @@
 # Índice de riesgo ambiental y sanitario — v1
 
-Fecha: 2026-11-21. Implementado en `supabase/riesgo.sql` (función `riesgo_basural(id)`), probado en PostgreSQL 16 + PostGIS con capas de ejemplo. Se muestra en el popup de cada basural revisado.
+Fecha: 2026-11-21. Implementado en `neon/riesgo.sql` (función `riesgo_basural(id)`), probado en PostgreSQL 16 + PostGIS con capas de ejemplo. Se muestra en el popup de cada basural revisado.
 
 ## Fórmula
 Riesgo (0–100) = 100 × promedio ponderado de 4 componentes (0–1). Clases: bajo < 34 ≤ medio < 67 ≤ alto.
