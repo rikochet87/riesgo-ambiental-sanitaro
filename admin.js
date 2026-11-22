@@ -113,7 +113,7 @@ function mostrarVacio() {
     : `No hay reportes en «${ESTADOS[filtro]}».`;
 }
 
-async function cargar(estado) {
+async function cargar(estado, { alAbrir = false } = {}) {
   filtro = estado;
   const este = ++pedidoActual;
   document.querySelectorAll('.filtros button').forEach((b) =>
@@ -129,6 +129,8 @@ async function cargar(estado) {
     datos = await api(`/reportes?estado=${encodeURIComponent(estado)}`);
   } catch (err) {
     if (este !== pedidoActual) return;
+    // Al abrir la página sin sesión no "venció" nada: solo pedir la clave
+    if (alAbrir && err.status === 401) { mostrarEntrada(); return; }
     if (!siSeCortoLaSesion(err)) aviso('No se pudo cargar la lista. ' + err.message, true);
     return;
   }
@@ -293,4 +295,4 @@ async function accion(el, r, boton) {
 // ---------------------------------------------------------------------
 // Al abrir: si ya hay sesión, directo a los pendientes
 // ---------------------------------------------------------------------
-cargar('pendiente');
+cargar('pendiente', { alAbrir: true });
