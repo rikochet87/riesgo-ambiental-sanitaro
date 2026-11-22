@@ -22,6 +22,7 @@ En línea: https://riesgo-ambiental-sanitaro.vercel.app
 | `neon/moderacion.sql` | Rol `moderador`, tope de intentos de entrada y registro de copias de seguridad |
 | `admin.html`, `admin.js`, `admin.css` | Panel de moderación (`/admin`) |
 | `admin-zip.js` | Arma el ZIP de la copia de seguridad en el navegador |
+| `indice.js` | Bloque del índice de riesgo, compartido por el popup público y el del panel |
 | `scripts/` | Recortes de las capas al Gran Resistencia (ver `scripts/README.md`) |
 
 ## Puesta en marcha
@@ -60,7 +61,8 @@ Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la 
 
 - **Mapa con todos los reportes** en sus coordenadas exactas (el mapa público las redondea), coloreados por estado. Los pendientes, en azul índigo, se dibujan más grandes y por encima. Mapa base de calles o satélite.
 - **Capas por estado** que se prenden y apagan: pendientes, activos (rojo), en gestión (amarillo), resueltos (verde) y descartados (gris, apagados al abrir). La lista sigue a las capas prendidas.
-- **Tocar un punto** (o una fila de la lista) abre su ficha: foto aunque no esté aprobada, datos del relevamiento, descripción, enlace a Google Maps y los botones de moderar. El punto queda marcado con un anillo. `Esc` vuelve a la lista.
+- **Tocar un punto** (o una fila de la lista) abre el **popup con el índice de riesgo**, el mismo que ve el público, pero también para pendientes y descartados, que sirve para priorizar qué revisar primero. En la compu se abre además la ficha en el panel; en el celular el popup trae un botón "Moderar este reporte" que lleva a la ficha.
+- **La ficha** muestra la foto aunque no esté aprobada, los datos del relevamiento, la descripción, un enlace a Google Maps y los botones de moderar. El punto queda marcado con un anillo. `Esc` vuelve a la lista.
 - **Publicar** pasa un pendiente a activo, con o sin su foto; el punto cambia de color en el acto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado y se publica o despublica la foto.
 - **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
 - Nota interna por reporte, que nunca se publica.

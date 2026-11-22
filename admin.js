@@ -2,6 +2,7 @@
 // sesión del moderador. Lo que escribió el vecino se muestra siempre como texto
 // (textContent), nunca como HTML.
 import { armarZip } from './admin-zip.js';
+import { htmlIndice } from './indice.js';
 
 const ESTADOS = {
   pendiente: 'Pendiente', verificado: 'Activo', en_gestion: 'En gestión',
@@ -91,6 +92,8 @@ $('btn-salir').addEventListener('click', async () => {
   try { await api('/entrar', { method: 'DELETE' }); } catch { /* igual se sale */ }
   reportes = [];
   seleccionado = null;
+  cacheIndice.clear();
+  if (mapa) cerrarPopup();
   capaPuntos?.clearLayers();
   anillo?.remove();
   $('lista').replaceChildren();
@@ -118,6 +121,8 @@ let mapa = null;
 let capaPuntos = null;
 let anillo = null;
 let yaEncuadrado = false;
+let popupIndice = null;
+const cacheIndice = new Map();
 
 const esCelular = () => matchMedia('(max-width: 899.98px)').matches;
 const formatoCorto = new Intl.DateTimeFormat('es-AR', {
@@ -267,7 +272,7 @@ function altura(valor) {
 $('asa').addEventListener('click', () => altura($('lateral').dataset.altura === 'baja' ? 'alta' : 'baja'));
 
 // Pone el punto en el centro de la parte del mapa que no tapa la hoja
-function centrarEn(r, { acercar }) {
+function centrarEn(r, { acercar, animar = true }) {
   const zoom = acercar ? Math.max(mapa.getZoom(), 16) : mapa.getZoom();
   let tapado = 0;
   if (esCelular()) {
@@ -276,24 +281,103 @@ function centrarEn(r, { acercar }) {
     tapado = valor === 'media' ? panel * 0.6 : valor === 'alta' ? panel * 0.86 : ALTO_HOJA_BAJA;
   }
   const centro = mapa.project([r.lat, r.lon], zoom).add([0, tapado / 2]);
-  mapa.setView(mapa.unproject(centro, zoom), zoom, { animate: true });
+  mapa.setView(mapa.unproject(centro, zoom), zoom, { animate: animar });
+}
+
+// ---------------------------------------------------------------------
+// Popup con el índice de riesgo (el mismo bloque que el mapa público)
+// ---------------------------------------------------------------------
+const formatoDia = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'short' });
+
+function cabeceraPopup(r) {
+  const fecha = formatoDia.format(new Date(r.creado_en));
+  const tipo = r.tipo && TIPOS[r.tipo] ? `${TIPOS[r.tipo]}, reportado el ${fecha}` : `Reportado el ${fecha}`;
+  return `<div class="rz-cab"><b><i class="luz" style="display:inline-block;margin-right:7px;vertical-align:1px;`
+    + `background:${COLORES[r.estado]}"></i>${ESTADOS[r.estado]}</b><span>${tipo}</span></div>`;
+}
+
+// La versión del panel calcula también pendientes y descartados
+async function pedirIndice(id) {
+  try {
+    return (await api(`/riesgo?id=${encodeURIComponent(id)}`)) || { error: true };
+  } catch (err) {
+    siSeCortoLaSesion(err);
+    return { error: true };
+  }
+}
+
+function abrirPopup(r, { conBotonModerar = false } = {}) {
+  // Como elemento y no como texto: al llegar el índice se actualiza sin rearmar el popup
+  const nodo = document.createElement('div');
+  nodo.className = 'rz';
+  const pintar = (riesgo) => {
+    nodo.innerHTML = cabeceraPopup(r) + htmlIndice(riesgo);
+    if (conBotonModerar) {
+      const boton = document.createElement('button');
+      boton.className = 'btn-petroleo ancho btn-moderar';
+      boton.textContent = 'Moderar este reporte';
+      boton.addEventListener('click', () => seleccionar(r.id));
+      nodo.append(boton);
+    }
+  };
+  pintar(cacheIndice.get(r.id) ?? null);
+  popupIndice = L.popup({
+    maxWidth: 300, minWidth: 260, offset: [0, -4],
+    autoPanPaddingTopLeft: [16, 16], autoPanPaddingBottomRight: [16, esCelular() ? ALTO_HOJA_BAJA + 16 : 16],
+  }).setLatLng([r.lat, r.lon]).setContent(nodo).openOn(mapa);
+
+  if (!cacheIndice.has(r.id)) {
+    pedirIndice(r.id).then((riesgo) => {
+      if (!riesgo.error) cacheIndice.set(r.id, riesgo);
+      if (popupIndice && popupIndice.getContent() === nodo && mapa.hasLayer(popupIndice)) {
+        pintar(riesgo);
+        popupIndice.update();
+      }
+    });
+  }
+}
+
+function cerrarPopup() {
+  if (popupIndice) mapa.closePopup(popupIndice);
+  popupIndice = null;
+}
+
+// ---------------------------------------------------------------------
+// Elegir un reporte
+// ---------------------------------------------------------------------
+function abrirFicha(r) {
+  $('ficha').replaceChildren(tarjeta(r));
+  $('vista-lista').hidden = true;
+  $('vista-ficha').hidden = false;
+  $('vista-ficha').scrollTop = 0;
 }
 
 function seleccionar(id, { desdeMapa = false } = {}) {
   const r = reportes.find((x) => x.id === id);
   if (!r) return;
   seleccionado = id;
-  $('ficha').replaceChildren(tarjeta(r));
-  $('vista-lista').hidden = true;
-  $('vista-ficha').hidden = false;
-  $('vista-ficha').scrollTop = 0;
   marcarSeleccion();
-  if (esCelular()) altura('media');
-  centrarEn(r, { acercar: !desdeMapa });
+
+  if (esCelular()) {
+    // En el celular no entran popup y ficha juntos: tocar un punto muestra el
+    // índice, y "Moderar este reporte" abre la ficha
+    if (desdeMapa) { abrirPopup(r, { conBotonModerar: true }); return; }
+    cerrarPopup();
+    abrirFicha(r);
+    altura('media');
+    centrarEn(r, { acercar: true });
+    return;
+  }
+
+  // En la compu: ficha en el panel y popup con el índice sobre el mapa
+  abrirFicha(r);
+  if (!desdeMapa) centrarEn(r, { acercar: true, animar: false });
+  abrirPopup(r);
 }
 
 function volverALista() {
   seleccionado = null;
+  cerrarPopup();
   marcarSeleccion();
   $('vista-ficha').hidden = true;
   $('ficha').replaceChildren();
@@ -444,6 +528,9 @@ async function accion(el, r, boton) {
     if (!r.tiene_foto) el.querySelector('.foto').replaceChildren();
     pintarFoto(el, r);
     dibujarPuntos();
+    // El índice cuenta los reportes activos cercanos: al moderar puede cambiar
+    cacheIndice.clear();
+    if (popupIndice && mapa.hasLayer(popupIndice) && seleccionado === r.id) abrirPopup(r);
     aviso(mensaje);
   } catch (err) {
     if (!siSeCortoLaSesion(err)) aviso('No se pudo guardar. ' + err.message, true);

@@ -11,6 +11,8 @@ import * as entrar from '../api/admin/entrar.js';
 import * as moderar from '../api/admin/reportes.js';
 import * as fotoAdmin from '../api/admin/foto.js';
 import * as exportar from '../api/admin/exportar.js';
+import * as riesgoAdmin from '../api/admin/riesgo.js';
+import * as riesgoPublico from '../api/riesgo.js';
 
 const SITIO = 'https://riesgo-ambiental-sanitaro.vercel.app';
 const CLAVE = 'una-clave-de-prueba-larga';
@@ -262,6 +264,38 @@ test('copia de seguridad: se anota y la lista del panel muestra la última', asy
                        (e) => e.code === '42501', 'el público no ve las copias');
   await assert.rejects(ejecutorLocal('moderador', [['delete from public.admin_copias', []]]),
                        (e) => e.code === '42501', 'el moderador no borra el registro');
+});
+
+test('índice de riesgo: el moderador lo ve también en pendientes; el público, solo en publicados', async () => {
+  await admin(`update public.reportes set estado = 'pendiente' where id = $1`, [ID_SIN_FOTO]);
+  assert.equal((await riesgoAdmin.GET(pedir(`/api/admin/riesgo?id=${ID_SIN_FOTO}`))).status, 401, 'sin sesión no');
+
+  const cookie = await sesion();
+  const r = await leer(await riesgoAdmin.GET(pedir(`/api/admin/riesgo?id=${ID_SIN_FOTO}`, { cookie })));
+  assert.equal(r.estado, 200);
+  assert.equal(typeof r.cuerpo.total, 'number', 'un pendiente tiene índice para el moderador');
+  assert.match(r.cache, /private/);
+  assert.equal(await (await riesgoPublico.GET(pedir(`/api/riesgo?id=${ID_SIN_FOTO}`))).json(), null,
+               'el público sigue sin ver el índice de un pendiente');
+  assert.equal((await riesgoAdmin.GET(pedir('/api/admin/riesgo?id=nada', { cookie }))).status, 400);
+
+  // Mismo número por las dos puertas cuando el reporte está publicado
+  const [{ estado }] = await admin('select estado from public.reportes where id = $1', [ID_FOTO]);
+  assert.equal(estado, 'verificado');
+  const porAdmin = await (await riesgoAdmin.GET(pedir(`/api/admin/riesgo?id=${ID_FOTO}`, { cookie }))).json();
+  const porPublico = await (await riesgoPublico.GET(pedir(`/api/riesgo?id=${ID_FOTO}`))).json();
+  assert.deepEqual(porAdmin, porPublico);
+});
+
+test('las funciones del índice: cada rol solo llega a su puerta', async () => {
+  const casos = [
+    ['anonymous', `select public.riesgo_basural_moderacion('${ID_SIN_FOTO}')`],
+    ['anonymous', `select public.riesgo_calculo('${ID_SIN_FOTO}', false)`],
+    ['moderador', `select public.riesgo_calculo('${ID_SIN_FOTO}', false)`],
+  ];
+  for (const [rol, sql] of casos) {
+    await assert.rejects(ejecutorLocal(rol, [[sql, []]]), (e) => e.code === '42501', `${rol}: ${sql}`);
+  }
 });
 
 test('salir vence la cookie', async () => {

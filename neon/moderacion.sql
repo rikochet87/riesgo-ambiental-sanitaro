@@ -92,3 +92,20 @@ drop policy if exists "moderador_ve_copias" on public.admin_copias;
 create policy "moderador_ve_copias" on public.admin_copias for select to moderador using (true);
 drop policy if exists "moderador_anota_copias" on public.admin_copias;
 create policy "moderador_anota_copias" on public.admin_copias for insert to moderador with check (true);
+
+-- ---------------------------------------------------------------------
+-- Índice de riesgo para el panel: también de los pendientes y descartados
+-- ---------------------------------------------------------------------
+-- (riesgo_basural, la del público, solo calcula reportes ya publicados)
+create or replace function public.riesgo_basural_moderacion(p_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.riesgo_calculo(p_id, false);
+$$;
+
+revoke all on function public.riesgo_basural_moderacion(uuid) from public;
+grant execute on function public.riesgo_basural_moderacion(uuid) to moderador;

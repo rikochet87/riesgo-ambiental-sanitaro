@@ -1,6 +1,12 @@
 # Índice de riesgo ambiental y sanitario — v1
 
-Fecha: 2026-11-21. Implementado en `neon/riesgo.sql` (función `riesgo_basural(id)`), probado en PostgreSQL 16 + PostGIS con capas de ejemplo. Se muestra en el popup de cada basural revisado.
+Fecha: 2026-11-21. Implementado en `neon/riesgo.sql`, probado en PostgreSQL 16 + PostGIS con capas de ejemplo.
+
+El cálculo está en `riesgo_calculo(id, solo_publicados)`, que nadie puede llamar directo. Se llega por dos funciones (2026-11-22):
+- `riesgo_basural(id)`: la del público (rol `anonymous`), solo para basurales revisados. Se muestra en el popup del mapa público.
+- `riesgo_basural_moderacion(id)`: la del panel (rol `moderador`, en `neon/moderacion.sql`), para cualquier reporte, también pendientes. Se muestra en el popup del visor de moderación.
+
+Las dos dan el mismo resultado para un reporte publicado. El bloque que lo dibuja es `indice.js`, compartido por los dos popups.
 
 ## Fórmula
 Riesgo (0–100) = 100 × promedio ponderado de 4 componentes (0–1). Clases: bajo < 34 ≤ medio < 67 ≤ alto.

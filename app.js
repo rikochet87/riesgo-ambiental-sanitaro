@@ -1,4 +1,5 @@
 import { AREA, CENTRO_INICIAL, ZOOM_INICIAL } from './config.js';
+import { htmlIndice } from './indice.js';
 
 // ---------------------------------------------------------------------
 // Conexión con la base, a través de las funciones de /api (Vercel)
@@ -92,7 +93,6 @@ async function cargarReportesPublicos() {
 // ---------------------------------------------------------------------
 const cacheRiesgo = new Map();
 const cacheFoto = new Map();
-const COLOR_CLASE = { bajo: '#2f9e44', medio: '#e8590c', alto: '#e03131' };
 
 // El contenido va como elemento y no como texto: cuando llega la foto hay que
 // pedirle a Leaflet que reacomode el popup, y si el contenido fuera texto lo
@@ -137,20 +137,6 @@ async function cargarFoto(marcador, r) {
   }
 }
 
-const fmt = (n) => Number(n).toLocaleString('es-AR');
-
-function barra(nombre, puntaje, peso, detalle) {
-  const sinDatos = puntaje === null || puntaje === undefined;
-  const pct = sinDatos ? 0 : Math.round(puntaje * 100);
-  const color = sinDatos ? '#b8c4c6' : pct >= 67 ? '#e03131' : pct >= 34 ? '#f59f00' : '#2f9e44';
-  return `
-    <div class="rz-comp">
-      <div class="rz-fila"><span>${nombre}</span><b>${sinDatos ? 'sin datos' : pct}</b></div>
-      <div class="rz-barra"><i style="width:${pct}%;background:${color}"></i></div>
-      <div class="rz-det">${detalle}${peso != null ? ` · peso ${Math.round(peso * 100)}%` : ''}</div>
-    </div>`;
-}
-
 function htmlPopup(r, riesgo) {
   const fecha = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-AR');
   const tipo = r.tipo ? `${NOMBRES_TIPO[r.tipo] || r.tipo}, reportado el ${fecha}` : `Reportado el ${fecha}`;
@@ -163,52 +149,8 @@ function htmlPopup(r, riesgo) {
   // Hueco para la foto: lo completa cargarFoto() cuando llega la imagen
   const foto = r.tiene_foto ? '<div class="rz-foto">Cargando foto…</div>' : '';
 
-  if (!riesgo) return `<div class="rz">${cabecera}${foto}<p class="rz-cargando">Calculando índice de riesgo…</p></div>`;
-  if (riesgo.error) return `<div class="rz">${cabecera}${foto}<p class="rz-cargando">No se pudo calcular el índice ahora.</p></div>`;
-
-  const a = riesgo.amenaza, e = riesgo.exposicion, v = riesgo.vulnerabilidad, rv = riesgo.reportes, w = riesgo.pesos;
-
-  const detAmenaza = a.fuente === 'satelite'
-    ? [a.area_m2 != null ? `${fmt(Math.round(a.area_m2))} m²` : null,
-       a.quemas_12m != null ? `${a.quemas_12m} quema(s) en 12 meses` : null,
-       a.crecimiento_pct != null ? `crece ${fmt(a.crecimiento_pct)}%/año` : null].filter(Boolean).join(', ') + ' (satélite)'
-    : 'Estimada con el relevamiento vecinal (aún sin análisis satelital)';
-
-  const detExpo = e.puntaje == null
-    ? 'Faltan capas de población y equipamientos'
-    : [e.poblacion != null ? `~${fmt(e.poblacion)} personas` : null,
-       e.escuelas != null ? `${e.escuelas} escuela(s)` : null,
-       e.salud != null ? `${e.salud} centro(s) de salud` : null].filter(Boolean).join(', ') + ` a menos de ${e.radio_m} m`;
-
-  const detVuln = v.puntaje == null
-    ? 'Faltan capas de agua y zonas inundables'
-    : [v.distancia_agua_m != null
-        ? `${v.agua_nombre || v.agua_tipo || 'Curso de agua'} a ${fmt(v.distancia_agua_m)} m`
-        : `Sin agua a menos de ${v.radio_agua_m} m`,
-       v.zona_inundable === true ? 'en zona inundable' : v.zona_inundable === false ? 'fuera de zona inundable' : null,
-      ].filter(Boolean).join(', ');
-
-  const detRep = rv.activos > 0
-    ? `${rv.activos} reporte(s) activo(s) a menos de ${rv.radio_m} m; el más antiguo hace ${rv.dias_persistencia} días`
-    : `Sin reportes activos a menos de ${rv.radio_m} m`;
-
-  const clase = riesgo.clase || 'sin datos';
-  const colorClase = COLOR_CLASE[riesgo.clase] || '#888';
-
-  return `
-    <div class="rz">
-      ${cabecera}
-      ${foto}
-      <div class="rz-total" style="border-color:${colorClase}">
-        <span class="rz-num" style="color:${colorClase}">${riesgo.total ?? '–'}</span>
-        <span>Índice ambiental y sanitario<br><b style="color:${colorClase}">Riesgo ${clase}</b> <small>sobre 100</small></span>
-      </div>
-      ${barra('Amenaza', a.puntaje, w.amenaza, detAmenaza)}
-      ${barra('Exposición', e.puntaje, w.exposicion, detExpo)}
-      ${barra('Vulnerabilidad ambiental', v.puntaje, w.vulnerabilidad, detVuln)}
-      ${barra('Reportes vecinales', rv.puntaje, w.reportes, detRep)}
-      <p class="rz-nota">Índice preliminar: pesos y umbrales en calibración.</p>
-    </div>`;
+  // El índice lo arma indice.js, compartido con el panel de moderación
+  return `<div class="rz">${cabecera}${foto}${htmlIndice(riesgo)}</div>`;
 }
 
 // ---------------------------------------------------------------------

@@ -194,3 +194,6 @@ body.admin { height: 100vh; height: 100dvh; }
 @media (prefers-reduced-motion: reduce) {
   .lateral { transition: none; }
 }
+
+/* Popup del índice en el panel (el bloque .rz viene de styles.css, igual que en el mapa público) */
+.btn-moderar { margin-top: 12px; min-height: 44px; }

@@ -130,7 +130,10 @@ $$;
 -- ---------------------------------------------------------------------
 -- 5. Índice de riesgo de un basural (lo llama el popup del mapa)
 -- ---------------------------------------------------------------------
-create or replace function public.riesgo_basural(p_id uuid)
+-- El cálculo vive en riesgo_calculo, que nadie puede llamar directo. Lo usan
+-- dos puertas: riesgo_basural (público, solo reportes publicados) y
+-- riesgo_basural_moderacion (moderador, cualquier estado; en moderacion.sql).
+create or replace function public.riesgo_calculo(p_id uuid, p_solo_publicados boolean)
 returns jsonb
 language plpgsql
 stable
@@ -156,9 +159,11 @@ declare
 
   total numeric;  clase text;
 begin
-  -- Solo basurales ya revisados y visibles en el mapa público
+  -- Para el público, solo basurales ya revisados y visibles en el mapa;
+  -- para el panel de moderación, cualquier reporte
   select * into r from public.reportes
-  where id = p_id and estado in ('verificado', 'en_gestion', 'resuelto');
+  where id = p_id
+    and (not p_solo_publicados or estado in ('verificado', 'en_gestion', 'resuelto'));
   if not found then return null; end if;
 
   select * into p from public.parametros_riesgo limit 1;
@@ -276,6 +281,19 @@ begin
       'vulnerabilidad', p.peso_vulnerabilidad, 'reportes', p.peso_reportes)
   );
 end;
+$$;
+
+revoke all on function public.riesgo_calculo(uuid, boolean) from public;
+
+-- Puerta pública: igual que siempre, solo reportes ya publicados
+create or replace function public.riesgo_basural(p_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.riesgo_calculo(p_id, true);
 $$;
 
 revoke all on function public.riesgo_basural(uuid) from public;
