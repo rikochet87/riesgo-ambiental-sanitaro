@@ -51,12 +51,12 @@ const $ = (id) => document.getElementById(id);
 const mapa = L.map('mapa', { zoomControl: false, attributionControl: false }).setView(CENTRO_INICIAL, ZOOM_INICIAL);
 // Créditos arriba a la izquierda: abajo los tapa el panel del botón
 L.control.attribution({ position: 'topleft', prefix: false }).addTo(mapa);
-// Mapa base claro y de pocos colores, para que resalten los puntos del semáforo
-const calles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  maxZoom: 20,
-  subdomains: 'abcd',
-  attribution: '&copy; OpenStreetMap &copy; CARTO',
-}).addTo(mapa);
+// Mapa base claro y de pocos colores, para que resalten los puntos del semáforo.
+// Esri y no CARTO: CARTO pasó a pedir clave para sus teselas (2026).
+const calles = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom: 19, attribution: 'Mapa &copy; Esri &mdash; &copy; OpenStreetMap' },
+).addTo(mapa);
 
 const satelite = L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
