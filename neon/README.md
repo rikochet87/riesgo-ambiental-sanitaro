@@ -16,9 +16,11 @@ cadena de `DATABASE_URL` (cargada en Vercel) y, antes de cada consulta, hacen
 `set local role anonymous`: trabajan con los permisos del público. Ahí sigue
 estando toda la seguridad.
 
-**Quedaron habilitadas y sin uso** la Data API y Neon Auth, de la primera
-versión (la Data API exigía un JWT hasta para el acceso anónimo, y Neon Auth,
-que lo emitía, no respondió). Ver `docs/01_decisiones.md`.
+La Data API y Neon Auth de la primera versión se **apagaron el 2026-11-22**
+(la Data API exigía un JWT hasta para el acceso anónimo, y Neon Auth, que lo
+emitía, no respondió; ver `docs/01_decisiones.md`). Con eso la base no tiene
+ninguna entrada pública: solo se llega con la cadena de conexión. Queda el
+esquema `auth` que creó la Data API: solo tiene funciones auxiliares, sin datos.
 
 ## Orden de ejecución
 
