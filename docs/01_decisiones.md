@@ -11,15 +11,15 @@ Los vecinos marcan un basural en el mapa, con foto opcional, sin crear una cuent
 - Sin app asociada: se descarta por la complejidad que agrega.
 
 ## Infraestructura
-- GitHub Pages para la página (solo archivos estáticos).
+- **Vercel** (plan Hobby) para la página y para las funciones de `/api`, desde el 2026-11-22. Antes se pensaba en GitHub Pages; ver el cambio más abajo.
 - **Base: Neon** (plan gratuito), desde el 2026-11-22. Antes se había diseñado sobre Supabase, pero el cupo de 2 proyectos gratuitos ya estaba ocupado. Neon da 100 proyectos con 1 GB cada uno, trae PostGIS y su Data API es compatible con PostgREST, así que el modelo de seguridad se mantuvo casi igual.
 
-## Seguridad (toda dentro de la base, sin servidor)
-- El rol `anonymous` de la Data API solo puede insertar reportes: no puede leer la tabla, ni editarla, ni borrarla, ni cambiar el estado.
-- La página no lleva ninguna clave.
+## Seguridad (las reglas viven en la base)
+- El rol `anonymous` solo puede insertar reportes: no puede leer la tabla, ni editarla, ni borrarla, ni cambiar el estado. Las funciones de `/api` trabajan siempre con ese rol.
+- La página no lleva ninguna clave; la contraseña de la base está solo en Vercel.
 - Reglas en la base que validan los datos, más un tope de reportes por hora.
 - Las fotos se achican en el navegador, lo que borra la ubicación que trae el archivo.
-- PostGIS va en el esquema `gis` para que la Data API no exponga sus funciones.
+- PostGIS va en el esquema `gis`, separado de las tablas del proyecto.
 - Opcional: captcha (Cloudflare Turnstile) si aparece spam.
 
 ## Privacidad
@@ -41,7 +41,20 @@ Se guardan dentro de la tabla, no en un almacenamiento aparte: Neon no tiene uno
 ## Para reusar
 Las secciones de fauna y del semáforo de SIG Vial ya tienen resueltos la cola sin señal, los topes, la limpieza de fotos y la moderación.
 
+## Cambio 2026-11-22: de la Data API de Neon a funciones de Vercel
+El diseño original tenía a la página hablando directo con la Data API de Neon, sin servidor. Al desplegar se vio que la Data API exige un JWT en todo pedido, incluso el anónimo (la documentación de Neon se contradice en ese punto). La alternativa de Neon, un token anónimo emitido por Neon Auth, se probó y su servicio no respondió.
+
+Se pasó a funciones de Vercel en `/api`:
+- **Un solo host** en el camino: si la página carga, el resto funciona. Con Neon Auth eran dos servicios que tenían que estar arriba.
+- **La base deja de tener un acceso público.** Solo la alcanzan las funciones, con una contraseña que vive en Vercel.
+- **La seguridad no se movió:** cada función se baja al rol `anonymous` antes de cada consulta, así que siguen mandando los mismos permisos de la base.
+- Costo: unas 150 líneas de backend para mantener, cubiertas por pruebas (`pruebas/`).
+
+Las pruebas encontraron dos errores, ya corregidos:
+- Al reintentar un reporte que sí había llegado, el trigger contestaba "ya hay uno en ese lugar" (encontraba al mismo reporte) en vez de "ya está cargado". Venía del diseño original. Ahora el control de duplicados ignora el propio id.
+- La página tomaba cualquier respuesta 409 como "ya estaba cargado". Un vecino que reportaba donde ya había otro reporte reciente veía "¡Gracias!" sin que se guardara nada. Ahora se decide por el código de error, no por el estado HTTP.
+
 ## Puntos a resolver
-- GitHub Pages desde un repositorio privado requiere un plan pago (Pro o Team). Con cuenta gratuita, el repositorio tiene que ser público. No hay riesgo: la página no lleva claves y la protección la dan los permisos de la base.
+- El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.
 - La tarea programada de GitHub Actions para el respaldo CSV sigue pendiente.

@@ -1,18 +1,13 @@
-import { NEON_DATA_API, AREA, CENTRO_INICIAL, ZOOM_INICIAL } from './config.js';
+import { AREA, CENTRO_INICIAL, ZOOM_INICIAL } from './config.js';
 
 // ---------------------------------------------------------------------
-// Data API de Neon (compatible con PostgREST)
+// Conexión con la base, a través de las funciones de /api (Vercel)
 // ---------------------------------------------------------------------
-// Sin librerías ni claves: el rol anonymous solo puede insertar reportes,
-// leer la vista pública y llamar a las dos funciones. Lo permite la base.
-const CONFIGURADO = !NEON_DATA_API.includes('TU-PROYECTO');
-const API = NEON_DATA_API.replace(/\/+$/, '');
-
+// La página nunca habla con la base directo ni tiene claves: las funciones
+// de /api se conectan desde el servidor y siempre con los permisos del rol
+// anonymous (solo insertar reportes, leer la vista pública y las dos funciones).
 async function api(ruta, opciones = {}) {
-  if (!CONFIGURADO) {
-    throw Object.assign(new Error('La página todavía no está conectada a la base.'), { code: 'SIN_CONFIG' });
-  }
-  const res = await fetch(API + ruta, {
+  const res = await fetch('/api' + ruta, {
     ...opciones,
     headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) },
   });
@@ -22,16 +17,14 @@ async function api(ruta, opciones = {}) {
     throw Object.assign(new Error(cuerpo.message || `Error ${res.status}`),
                         { code: cuerpo.code, status: res.status });
   }
-  if (res.status === 204) return null;
   const texto = await res.text();
   return texto ? JSON.parse(texto) : null;
 }
 
-const apiSelect = (vista, consulta) => api(`/${vista}?${consulta}`);
-const apiInsert = (tabla, fila) =>
-  api(`/${tabla}`, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(fila) });
-const apiRpc = (funcion, args) =>
-  api(`/rpc/${funcion}`, { method: 'POST', body: JSON.stringify(args) });
+const pedirReportes = () => api('/reportes');
+const pedirRiesgo = (id) => api(`/riesgo?id=${encodeURIComponent(id)}`);
+const pedirFoto = (id) => api(`/foto?id=${encodeURIComponent(id)}`);
+const subirReporte = (fila) => api('/reportes', { method: 'POST', body: JSON.stringify(fila) });
 
 const FOTO_LADO_MAX = 1000;      // px
 const FOTO_PESO_OBJETIVO = 200_000; // bytes (la foto viaja dentro del reporte)
@@ -72,11 +65,9 @@ mapa.getContainer().appendChild($('mira'));
 const capaPublica = L.layerGroup().addTo(mapa);
 
 async function cargarReportesPublicos() {
-  if (!CONFIGURADO) return;
   let data;
   try {
-    data = await apiSelect('reportes_publicos',
-      'select=id,lat,lon,estado,tipo,tamano,quema,fecha,tiene_foto&limit=3000');
+    data = await pedirReportes();
   } catch (err) { console.warn('No se pudo cargar el mapa público', err); return; }
 
   capaPublica.clearLayers();
@@ -102,7 +93,7 @@ async function cargarRiesgo(marcador, r) {
   if (cacheRiesgo.has(r.id)) { marcador.setPopupContent(htmlPopup(r, cacheRiesgo.get(r.id))); return; }
   let riesgo;
   try {
-    riesgo = (await apiRpc('riesgo_basural', { p_id: r.id })) || { error: true };
+    riesgo = (await pedirRiesgo(r.id)) || { error: true };
     if (!riesgo.error) cacheRiesgo.set(r.id, riesgo);
   } catch (err) { console.warn('No se pudo calcular el índice', err); riesgo = { error: true }; }
   marcador.setPopupContent(htmlPopup(r, riesgo));
@@ -116,7 +107,7 @@ async function cargarFoto(marcador, r) {
   try {
     let base64 = cacheFoto.get(r.id);
     if (base64 === undefined) {
-      base64 = await apiRpc('foto_basural', { p_id: r.id });
+      base64 = await pedirFoto(r.id);
       cacheFoto.set(r.id, base64);
     }
     if (!base64) { hueco.remove(); return; }
@@ -365,22 +356,25 @@ const guardarEnCola = (rep) => operarCola('readwrite', (s) => s.put(rep));
 const borrarDeCola = (id) => operarCola('readwrite', (s) => s.delete(id));
 const listarCola = () => operarCola('readonly', (s) => s.getAll());
 
+// Vale la pena guardarlo y reintentar: sin señal, o el servidor falló (5xx).
+// Un rechazo de la base (4xx: datos inválidos, duplicado, tope) no se reintenta.
 function esErrorDeRed(err) {
   if (!navigator.onLine) return true;
+  if (err && err.status >= 500) return true;
   const msg = String((err && (err.message || err.error)) || err || '');
   return /fetch|network|load failed|timeout/i.test(msg) && !(err && err.code);
 }
 
 function yaExiste(err) {
-  // 23505: el reporte ya está en la base (reintento tras un envío que sí llegó)
-  if (!err) return false;
-  return err.code === '23505' || err.status === 409 ||
-    /already exists|duplicate/i.test(err.message || '');
+  // 23505: el reporte ya está en la base (reintento tras un envío que sí llegó).
+  // Solo por el código: P0002 (otro reporte en el mismo lugar) también es un
+  // 409, y tomarlo como éxito le diría "gracias" al vecino sin haber guardado.
+  return err?.code === '23505';
 }
 
 async function enviarReporte(rep) {
   try {
-    await apiInsert('reportes', rep.datos);
+    await subirReporte(rep.datos);
   } catch (err) {
     if (!yaExiste(err)) throw err;
   }
@@ -429,7 +423,7 @@ async function alEnviar(e) {
     if (esErrorDeRed(err)) {
       await guardarEnCola(rep);
       cerrarHoja();
-      aviso('Sin conexión: guardamos el reporte y se enviará solo cuando vuelva la señal.');
+      aviso('No se pudo enviar ahora: guardamos el reporte y se enviará solo más tarde.');
       actualizarAvisoPendientes();
     } else {
       aviso(mensajeDeError(err), true);
@@ -441,7 +435,7 @@ async function alEnviar(e) {
 
 let reintentando = false;
 async function reintentarPendientes() {
-  if (reintentando || !CONFIGURADO || !navigator.onLine) return;
+  if (reintentando || !navigator.onLine) return;
   reintentando = true;
   try {
     const pendientes = await listarCola();
@@ -498,10 +492,6 @@ $('foto').addEventListener('change', alElegirFoto);
 $('form').addEventListener('submit', alEnviar);
 $('btn-info').addEventListener('click', () => $('dlg-info').showModal());
 window.addEventListener('online', reintentarPendientes);
-
-if (!CONFIGURADO) {
-  console.warn('Completá config.js con la URL de la Data API de tu proyecto de Neon.');
-}
 
 cargarReportesPublicos();
 reintentarPendientes();

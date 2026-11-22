@@ -1,6 +1,8 @@
 # Basurales Gran Resistencia — v1
 
-Página web adaptativa (pensada para celular) donde los vecinos denuncian y relevan basurales sin crear una cuenta. Archivos estáticos para GitHub Pages + Neon (plan gratuito).
+Página web adaptativa (pensada para celular) donde los vecinos denuncian y relevan basurales sin crear una cuenta. Publicada en Vercel (página estática + funciones en `/api`) con la base en Neon, ambos en plan gratuito.
+
+En línea: https://riesgo-ambiental-sanitaro.vercel.app
 
 ## Archivos
 
@@ -10,29 +12,42 @@ Página web adaptativa (pensada para celular) donde los vecinos denuncian y rele
 | `styles.css` | Estilos (celular primero; en pantallas anchas el formulario va a la derecha) |
 | `temas/` | Variantes de color y botones. La página usa `tema-monte.css` |
 | `app.js` | Lógica: mapa, ubicación, foto, envío y cola sin señal |
-| `config.js` | Dirección de la Data API, área válida y centro del mapa |
+| `config.js` | Área válida y centro del mapa |
+| `api/` | Funciones de Vercel: lo único que habla con la base (ver abajo) |
+| `vercel.json` | Región de las funciones (São Paulo) y cabeceras de seguridad, CSP incluida |
+| `package.json` | Dependencias de las funciones y comandos `npm test` / `npm run local` |
+| `pruebas/` | Pruebas de `/api` y un servidor local que imita a Vercel |
 | `neon/schema.sql` | Tabla, permisos, reglas, topes, vista pública y fotos |
 | `neon/riesgo.sql` | Índice de riesgo y capas de contexto |
 | `scripts/` | Recortes de las capas al Gran Resistencia (ver `scripts/README.md`) |
 
 ## Puesta en marcha
 
-1. **Neon:** creá un proyecto. Entrá a *Postgres database > Data API*, elegí la rama y tocá **Enable Data API**. Eso crea los roles `anonymous` y `authenticated` y te da la dirección REST.
-2. **Base:** abrí el *SQL Editor*, pegá todo `neon/schema.sql` y ejecutalo. Después hacé lo mismo con `neon/riesgo.sql`.
-3. **Dirección:** copiá la URL REST de la Data API (la que incluye `.apirest` y termina en `/rest/v1`) en `config.js`. No hay ninguna clave que copiar.
-4. **Dominios permitidos:** en los ajustes de la Data API, poné la dirección de tu GitHub Pages en *CORS*. Si lo dejás vacío, cualquier sitio puede llamar a la API.
-5. **Caché del esquema:** cada vez que cambies tablas o funciones, tocá *Refresh schema cache* en la Data API.
-6. **GitHub:** subí la carpeta a un repositorio y activá *Settings > Pages* (rama `main`, carpeta raíz). Con cuenta gratuita, Pages exige que el repositorio sea público. Es seguro: la página no lleva claves y la base solo permite insertar.
-7. Abrí la URL de Pages desde el celular y probá un reporte.
+1. **Neon:** creá un proyecto. En el *SQL Editor* pegá y ejecutá `neon/schema.sql` y después `neon/riesgo.sql`. Si el rol `anonymous` no existe, el esquema lo crea.
+2. **Vercel:** importá el repositorio (*Add New > Project*). No lleva comando de build: Vercel publica los archivos y arma las funciones de `api/`.
+3. **Conexión:** en Neon, *Connect* → copiá la cadena de conexión (`postgresql://...`). En Vercel, *Settings > Environment Variables*, creá `DATABASE_URL` con ese valor y volvé a desplegar. Esa cadena lleva la contraseña: va solo ahí, nunca al repositorio ni a la página.
+4. Abrí la URL de Vercel desde el celular y probá un reporte.
+
+Cada `git push` a `main` vuelve a desplegar solo.
+
+### Probar en tu computadora
+
+Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` cargados:
+
+- `npm test`: prueba las funciones de `/api`, incluidos los intentos de abuso.
+- `npm run local`: sirve la página y `/api` en `http://localhost:8000`, con las mismas cabeceras que Vercel.
 
 ## Cómo funciona la seguridad
 
-- La página **no usa ninguna clave**. Llama a la Data API como rol `anonymous`, y ese rol **solo puede insertar** reportes, con las columnas del vecino. No puede leer la tabla, ni editarla, ni borrarla, ni cambiar el estado.
+- La página **no lleva ninguna clave** y nunca habla con la base: habla con las funciones de `/api`, en el mismo dominio. La contraseña de la base vive solo en Vercel.
+- Cada función abre una transacción y lo primero que hace es `set local role anonymous`: trabaja con los permisos del público. Ese rol **solo puede insertar** reportes, con las columnas del vecino; no puede leer la tabla, ni editarla, ni borrarla, ni cambiar el estado. Si algún día una función tuviera un error, la base igual la frenaría.
+- La lista de columnas que acepta el alta es fija: cualquier otra clave del JSON (`estado`, `foto_aprobada`...) se descarta.
+- La página solo puede conectarse con su propio dominio (`connect-src 'self'` en la CSP de `vercel.json`).
 - Reglas en la base: punto dentro del Gran Resistencia, valores válidos en las listas, comentario de hasta 500 caracteres, foto de hasta 400 KB.
 - **Topes:** 200 reportes por hora en total (se cambia en `reportes_control_insercion`) y rechazo de reportes a menos de 20 m de otro de los últimos 10 minutos.
 - **Fotos:** el navegador las achica a 1000 px y unos 200 KB, y al redibujarlas se pierden los metadatos, incluida la ubicación GPS. Viajan dentro del reporte y se guardan en la misma tabla. El público nunca lee esa columna: la foto se sirve de a una, ya aprobada, con la función `foto_basural()`.
 - **Mapa público:** lee solo la vista `reportes_publicos`, con reportes ya revisados, coordenadas redondeadas (~11 m) y sin comentario ni foto.
-- **PostGIS** vive en el esquema `gis`, no en `public`, para que la Data API no exponga sus funciones.
+- **PostGIS** vive en el esquema `gis`, no en `public`, separado de las tablas del proyecto.
 - **Bots:** campo trampa invisible; si se completa, no se envía nada.
 
 ## Moderar
@@ -74,12 +89,12 @@ Las fuentes de cada capa están en `docs/04_fuentes_capas.md`.
 
 ## Sin señal
 
-Si el envío falla por falta de conexión, el reporte (con su foto) queda guardado en el navegador y se reintenta solo al recuperar la señal o al volver a abrir la página. El id lo genera el celular, así que un reintento nunca duplica el reporte.
+Si el envío falla por falta de conexión o por un error del servidor, el reporte (con su foto) queda guardado en el navegador y se reintenta solo al recuperar la señal o al volver a abrir la página. El id lo genera el celular, así que un reintento nunca duplica el reporte. Un rechazo de la base (datos inválidos, otro reporte en el mismo lugar, tope por hora) se le muestra al vecino y no se reintenta.
 
 ## Límites del plan gratuito de Neon
 
 - 1 GB por proyecto. Las fotos comparten ese espacio: a 200 KB cada una entran unas 4000.
-- 5 GB de tráfico de salida por mes. La foto solo se descarga al tocar un punto.
+- 5 GB de tráfico de salida por mes. La foto solo se descarga al tocar un punto, y la CDN de Vercel guarda unos minutos la lista del mapa, las fotos y los índices, así que la mayoría de las visitas ni despiertan la base.
 - 100 horas de cómputo por mes. La base se duerme tras 5 minutos sin uso y despierta sola en el primer pedido, así que no hay que reactivarla a mano.
 - No hay copias de seguridad automáticas: conviene exportar un CSV cada tanto.
 

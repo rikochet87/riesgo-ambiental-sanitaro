@@ -11,12 +11,12 @@ Fecha: 2026-11-21. Implementado en `neon/schema.sql` (probado en PostgreSQL 16 +
 - Moderación: `estado` (pendiente, verificado, en_gestion, resuelto, descartado), `foto_aprobada`, `revisado_en`, `nota_admin`
 
 ## Reglas
-- Público (rol `anonymous` de la Data API): solo INSERT de las columnas del vecino; sin SELECT/UPDATE/DELETE.
+- Público (rol `anonymous`, el que usan las funciones de `/api`): solo INSERT de las columnas del vecino; sin SELECT/UPDATE/DELETE.
 - Área válida: lat −27,62 a −27,30; lon −59,15 a −58,85.
 - Tope global 200 reportes/hora; rechazo de reportes a menos de 20 m de otro en los últimos 10 min.
 - Vista `reportes_publicos`: solo verificado / en_gestion / resuelto, coordenadas redondeadas a 4 decimales, sin comentario ni foto; trae `tiene_foto`.
 - Función `foto_basural(id)`: devuelve la foto en base64, de a una, solo si está aprobada.
-- PostGIS en el esquema `gis`, fuera del alcance de la Data API.
+- PostGIS en el esquema `gis`, separado de las tablas del proyecto.
 - Semáforo: verificado = rojo, en_gestion = amarillo, resuelto = verde.
 
 ## Página v1

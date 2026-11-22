@@ -8,3 +8,10 @@ scripts/rutas_locales.py
 
 # Datos originales descargados (pesados; se citan en docs/04_fuentes_capas.md)
 fuentes/
+
+node_modules/
+
+# Credenciales locales (la de la base va en Vercel, nunca al repo)
+.env
+.env.*
+.vercel/

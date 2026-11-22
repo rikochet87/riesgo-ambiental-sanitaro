@@ -9,20 +9,21 @@ Estado: **creada y probada el 2026-11-22**.
 | Base | `neondb` |
 | Región | São Paulo (`aws-sa-east-1`) |
 | PostgreSQL | 18, con PostGIS en el esquema `gis` |
-| Data API | habilitada, rol anónimo `anonymous`, solo esquema `public` |
-| URL REST | la que está en `config.js` |
+| Quién se conecta | solo las funciones de `/api` en Vercel, con `DATABASE_URL` |
 
-La URL no lleva clave: quien la tenga puede hacer **solo** lo que el rol
-`anonymous` tiene permitido en la base. Ahí está toda la seguridad.
+La página no habla con la base. Las funciones de `/api` se conectan con la
+cadena de `DATABASE_URL` (cargada en Vercel) y, antes de cada consulta, hacen
+`set local role anonymous`: trabajan con los permisos del público. Ahí sigue
+estando toda la seguridad.
+
+**Quedaron habilitadas y sin uso** la Data API y Neon Auth, de la primera
+versión (la Data API exigía un JWT hasta para el acceso anónimo, y Neon Auth,
+que lo emitía, no respondió). Ver `docs/01_decisiones.md`.
 
 ## Orden de ejecución
 
-1. Data API habilitada en la rama (crea los roles `anonymous` y `authenticated`).
-2. `schema.sql`
-3. `riesgo.sql`
-
-Después de cualquier cambio de estructura hay que refrescar la caché de la
-Data API (en la consola, *Refresh schema cache*), o no aparece lo nuevo.
+1. `schema.sql` (crea el rol `anonymous` si falta)
+2. `riesgo.sql`
 
 ## Qué puede hacer el público
 
@@ -37,7 +38,7 @@ Data API (en la consola, *Refresh schema cache*), o no aparece lo nuevo.
 | Insertar fuera del Gran Resistencia, o con un tipo inventado | bloqueado por las reglas |
 | Leer las capas de contexto o los parámetros | bloqueado |
 
-Probado el 2026-11-22 ejecutando cada caso con `set role anonymous`.
+Probado el 2026-11-22 ejecutando cada caso con `set role anonymous`, y de nuevo a través de las funciones de `/api` (`npm test`).
 La prueba de alta completa (insertar → verificar → ver en el mapa → traer la
 foto → calcular el riesgo) también pasó; el reporte de prueba quedó borrado.
 
@@ -46,13 +47,12 @@ y reportes vecinales tenían datos, exposición y vulnerabilidad quedaron en
 `null` y los pesos se repartieron entre los dos factores con datos, que es
 justo lo que tiene que pasar mientras falten capas.
 
-## Desde qué sitios se puede llamar (CORS)
+## Abuso
 
-Configurado para `https://rikochet87.github.io` y `localhost:8000`. Si la
-página se publica en otro dominio, hay que agregarlo. Esto no es una
-protección real (un programa puede llamar igual, sin navegador); lo que frena
-el abuso son los topes del trigger: 200 reportes por hora y un reporte por
-punto cada 10 minutos.
+Lo frenan los topes del trigger: 200 reportes por hora en total y uno por
+punto cada 10 minutos. La CSP de la página solo le permite hablar con su
+propio dominio, pero eso frena navegadores, no programas: los topes son la
+protección real.
 
 ## Moderar
 

@@ -1,0 +1,19 @@
+{
+  "name": "riesgo-ambiental-sanitaro",
+  "private": true,
+  "type": "module",
+  "description": "Reportes vecinales de basurales en el Gran Resistencia",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "test": "node --test \"pruebas/*.test.mjs\"",
+    "local": "node pruebas/servidor_local.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.1"
+  },
+  "devDependencies": {
+    "pg": "^8.16.0"
+  }
+}

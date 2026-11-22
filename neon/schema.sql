@@ -129,11 +129,15 @@ begin
         using errcode = 'P0001';
     end if;
 
-    -- Mismo punto (menos de 20 m) en los últimos 10 minutos = duplicado
+    -- Mismo punto (menos de 20 m) en los últimos 10 minutos = duplicado.
+    -- Se excluye el mismo id: si es el reintento de un reporte que ya llegó,
+    -- tiene que fallar la clave primaria (23505) y no esto, así la app sabe
+    -- que puede sacarlo de su cola.
     if exists (
       select 1
       from public.reportes r
       where r.creado_en > now() - interval '10 minutes'
+        and r.id <> new.id
         and gis.st_dwithin(
               r.geom::gis.geography,
               gis.st_setsrid(gis.st_makepoint(new.lon, new.lat), 4326)::gis.geography,
