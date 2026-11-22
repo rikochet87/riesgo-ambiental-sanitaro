@@ -15,7 +15,7 @@ export async function GET(request) {
   if (estado !== 'todos' && !ESTADOS.includes(estado)) return malPedido('Estado desconocido.');
 
   try {
-    const [filas, conteo] = await comoModerador([
+    const [filas, conteo, [copia]] = await comoModerador([
       [`select id, creado_en, lat, lon, tipo, tamano, quema, cerca_agua, cerca_escuela, antiguedad,
                descripcion, estado, foto_aprobada, (foto is not null) as tiene_foto,
                revisado_en, nota_admin
@@ -24,10 +24,11 @@ export async function GET(request) {
         order by creado_en desc
         limit 300`, [estado]],
       ['select estado, count(*)::int as n from public.reportes group by estado', []],
+      ['select max(hecha_en) as ultima from public.admin_copias', []],
     ]);
     const cantidades = Object.fromEntries(ESTADOS.map((e) => [e, 0]));
     for (const { estado: e, n } of conteo) cantidades[e] = n;
-    return json({ reportes: filas, cantidades });
+    return json({ reportes: filas, cantidades, ultima_copia: copia?.ultima ?? null });
   } catch (err) {
     return errorDeBase(err);
   }

@@ -57,4 +57,4 @@ Las pruebas encontraron dos errores, ya corregidos:
 ## Puntos a resolver
 - El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.
-- La tarea programada de GitHub Actions para el respaldo CSV sigue pendiente.
+- Copias de seguridad (2026-11-22): se descartó la exportación automática con GitHub Actions, porque el repositorio es público y la copia tiene datos privados (fotos sin aprobar, descripciones, ubicaciones exactas). También se descartó subir directo a Google Drive: con una cuenta personal, las cuentas de servicio no tienen cuota y el token de OAuth en modo de prueba vence cada 7 días. Quedó un botón en el panel que descarga un ZIP (GeoJSON, CSV, fotos) para guardar en la compu o en Drive, con aviso si pasa una semana sin copia. Es manual: protege solo si se hace.

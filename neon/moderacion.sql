@@ -74,3 +74,21 @@ $$;
 
 revoke all on function public.admin_intento(boolean) from public;
 grant execute on function public.admin_intento(boolean) to anonymous;
+
+-- ---------------------------------------------------------------------
+-- Copias de seguridad descargadas desde el panel
+-- ---------------------------------------------------------------------
+-- El ZIP se arma en el navegador del moderador; acá solo queda anotado
+-- cuándo se bajó la última, para que el panel avise si pasa una semana.
+create table if not exists public.admin_copias (
+  hecha_en  timestamptz not null default now(),
+  reportes  integer not null check (reportes >= 0),
+  fotos     integer not null check (fotos >= 0)
+);
+alter table public.admin_copias enable row level security;
+revoke all on public.admin_copias from anonymous, authenticated, moderador;
+grant select, insert (reportes, fotos) on public.admin_copias to moderador;
+drop policy if exists "moderador_ve_copias" on public.admin_copias;
+create policy "moderador_ve_copias" on public.admin_copias for select to moderador using (true);
+drop policy if exists "moderador_anota_copias" on public.admin_copias;
+create policy "moderador_anota_copias" on public.admin_copias for insert to moderador with check (true);

@@ -1,6 +1,7 @@
 // Panel de moderación. Todo lo que muestra viene de /api/admin, que exige la
 // sesión del moderador. Lo que escribió el vecino se muestra siempre como texto
 // (textContent), nunca como HTML.
+import { armarZip } from './admin-zip.js';
 
 const ESTADOS = {
   pendiente: 'Pendiente', verificado: 'Activo', en_gestion: 'En gestión',
@@ -139,6 +140,7 @@ async function cargar(estado, { alAbrir = false } = {}) {
   mostrarPanel();
   cantidades = datos.cantidades;
   pintarCantidades();
+  pintarCopia(datos.ultima_copia);
   $('lista').replaceChildren(...datos.reportes.map(tarjeta));
   mostrarVacio();
 }
@@ -291,6 +293,208 @@ async function accion(el, r, boton) {
     el.classList.remove('ocupada');
   }
 }
+
+// ---------------------------------------------------------------------
+// Copia de seguridad
+// ---------------------------------------------------------------------
+// Todo se arma en este navegador: los datos se piden de a 1000 y las fotos de
+// a una (Vercel no deja que una función devuelva más de 4,5 MB). El ZIP queda
+// en la carpeta de descargas; de ahí se guarda en la compu o en Drive.
+const DIAS_PARA_AVISAR = 7;
+const zonaAR = 'America/Argentina/Buenos_Aires';
+const fechaHoraAR = (iso) => new Intl.DateTimeFormat('es-AR', {
+  timeZone: zonaAR, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+}).format(new Date(iso));
+
+function pintarCopia(ultima) {
+  const caja = $('copia');
+  const estado = $('copia-estado');
+  if (!ultima) {
+    estado.textContent = 'Todavía no se descargó ninguna copia.';
+    caja.classList.add('vencida');
+    return;
+  }
+  const dias = Math.floor((Date.now() - new Date(ultima)) / 86_400_000);
+  estado.textContent = dias === 0 ? `Última: hoy, ${fechaHoraAR(ultima).split(', ')[1]}`
+    : dias === 1 ? 'Última: ayer'
+    : `Última: hace ${dias} días (${fechaHoraAR(ultima).split(',')[0]})`;
+  if (dias >= DIAS_PARA_AVISAR) estado.textContent += '. Conviene hacer una nueva.';
+  caja.classList.toggle('vencida', dias >= DIAS_PARA_AVISAR);
+}
+
+// Para Excel en español: punto y coma entre columnas y coma decimal
+function celda(valor, { texto = false } = {}) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'boolean') return valor ? 'sí' : 'no';
+  if (typeof valor === 'number') return String(valor).replace('.', ',');
+  let t = String(valor);
+  // Un texto del vecino que empieza con = + - @ Excel lo tomaría como fórmula
+  if (texto && /^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return /[";\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
+
+const fechaCsv = (iso) => iso ? new Intl.DateTimeFormat('sv-SE', {
+  timeZone: zonaAR, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+}).format(new Date(iso)) : '';
+
+function csv(reportes) {
+  const columnas = ['id', 'fecha_reporte', 'latitud', 'longitud', 'estado', 'tipo', 'tamano', 'lo_queman',
+    'cerca_de_agua', 'cerca_de_escuela_o_salud', 'antiguedad', 'descripcion', 'tiene_foto', 'foto_publicada',
+    'foto_archivo', 'revisado', 'nota_interna'];
+  const filas = reportes.map((r) => [
+    r.id, fechaCsv(r.creado_en), r.lat, r.lon, ESTADOS[r.estado], TIPOS[r.tipo] ?? r.tipo, TAMANOS[r.tamano] ?? r.tamano,
+    r.quema, r.cerca_agua, r.cerca_escuela, ANTIGUEDADES[r.antiguedad] ?? r.antiguedad,
+    [r.descripcion, { texto: true }], r.tiene_foto, r.foto_aprobada, r.tiene_foto ? `fotos/${r.id}.jpg` : null,
+    fechaCsv(r.revisado_en), [r.nota_admin, { texto: true }],
+  ].map((v) => (Array.isArray(v) ? celda(...v) : celda(v))).join(';'));
+  // BOM: sin él, Excel abre el UTF-8 con las tildes rotas
+  return '﻿' + [columnas.join(';'), ...filas].join('\r\n') + '\r\n';
+}
+
+function geojson(reportes) {
+  return JSON.stringify({
+    type: 'FeatureCollection',
+    name: 'reportes_basurales',
+    crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } },
+    features: reportes.map(({ lat, lon, ...resto }) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+      properties: { ...resto, foto_archivo: resto.tiene_foto ? `fotos/${resto.id}.jpg` : null },
+    })),
+  }, null, 1);
+}
+
+function leeme(reportes, fotos, faltantes, ahora) {
+  return [
+    'COPIA DE SEGURIDAD - Basurales en el Gran Resistencia',
+    `Descargada el ${fechaHoraAR(ahora.toISOString())} (hora de Argentina).`,
+    `Reportes: ${reportes.length}. Fotos: ${fotos}.`,
+    faltantes.length ? `ATENCIÓN: no se pudieron bajar ${faltantes.length} fotos: ${faltantes.join(', ')}` : 'Copia completa.',
+    '',
+    'ES PRIVADA: tiene fotos sin aprobar, descripciones y ubicaciones exactas,',
+    'también de reportes descartados. No la compartas.',
+    '',
+    'ARCHIVOS',
+    '  reportes.geojson  Todos los reportes con todos sus datos, en EPSG:4326.',
+    '                    Se abre directo en QGIS. Es la fuente para restaurar:',
+    '                    los nombres de campo son los de la tabla public.reportes.',
+    '  reportes.csv      Lo mismo para Excel (punto y coma, coma decimal,',
+    '                    fechas en hora de Argentina).',
+    '  fotos/<id>.jpg    La foto de cada reporte que tiene una, aprobada o no.',
+    '',
+    'CAMPOS',
+    '  id               Identificador del reporte (lo genera el celular del vecino).',
+    '  creado_en        Cuándo llegó (UTC en el GeoJSON).',
+    '  estado           pendiente, verificado (activo, rojo), en_gestion (amarillo),',
+    '                   resuelto (verde) o descartado.',
+    '  tipo, tamano, antiguedad, quema, cerca_agua, cerca_escuela',
+    '                   Relevamiento opcional del vecino.',
+    '  descripcion      Texto libre del vecino.',
+    '  tiene_foto       Si el reporte tiene foto guardada.',
+    '  foto_aprobada    Si la foto se muestra en el mapa público.',
+    '  foto_bytes       Tamaño de la foto.',
+    '  revisado_en      Última vez que se moderó.',
+    '  nota_admin       Nota interna del moderador.',
+    '',
+    'RESTAURAR',
+    '  La estructura de la base está en el repositorio (neon/*.sql). Los datos se',
+    '  cargan desde reportes.geojson (por ejemplo, importándolo con QGIS a una tabla',
+    '  temporal y copiándolo a public.reportes), y las fotos desde fotos/.',
+    '',
+  ].join('\r\n');
+}
+
+function base64ABytes(base64) {
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
+
+async function bajarFoto(id) {
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const base64 = await api(`/foto?id=${encodeURIComponent(id)}`);
+      return base64 ? base64ABytes(base64) : null;
+    } catch (err) {
+      if (err.status === 401 || intento === 1) throw err;
+    }
+  }
+  return null;
+}
+
+$('btn-copia').addEventListener('click', async () => {
+  const boton = $('btn-copia');
+  const estado = $('copia-estado');
+  boton.disabled = true;
+  const textoBoton = boton.textContent;
+  boton.textContent = 'Preparando…';
+  try {
+    const reportes = [];
+    for (let pagina = 0; ; pagina++) {
+      estado.textContent = `Bajando datos… (${reportes.length} reportes)`;
+      const datos = await api(`/exportar?pagina=${pagina}`);
+      reportes.push(...datos.reportes);
+      if (!datos.hay_mas) break;
+    }
+
+    const conFoto = reportes.filter((r) => r.tiene_foto);
+    const archivosFotos = [];
+    const faltantes = [];
+    let hechas = 0;
+    const cola = [...conFoto];
+    // De a cuatro a la vez: más rápido que de a una, sin saturar la base
+    await Promise.all(Array.from({ length: Math.min(4, cola.length) }, async () => {
+      while (cola.length) {
+        const r = cola.shift();
+        try {
+          const bytes = await bajarFoto(r.id);
+          if (bytes) archivosFotos.push({ nombre: `fotos/${r.id}.jpg`, datos: bytes });
+          else faltantes.push(r.id);
+        } catch (err) {
+          if (err.status === 401) throw err;
+          faltantes.push(r.id);
+        }
+        hechas++;
+        estado.textContent = `Bajando fotos… ${hechas} de ${conFoto.length}`;
+      }
+    }));
+
+    const ahora = new Date();
+    archivosFotos.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const zip = armarZip([
+      { nombre: 'LEEME.txt', datos: leeme(reportes, archivosFotos.length, faltantes, ahora) },
+      { nombre: 'reportes.geojson', datos: geojson(reportes) },
+      { nombre: 'reportes.csv', datos: csv(reportes) },
+      ...archivosFotos,
+    ], ahora);
+
+    const sello = fechaCsv(ahora.toISOString()).replace(' ', '_').replace(':', '');
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(zip);
+    enlace.download = `basurales-copia-${sello}.zip`;
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 60_000);
+
+    const anotada = await api('/exportar', {
+      method: 'POST', body: JSON.stringify({ reportes: reportes.length, fotos: archivosFotos.length }),
+    });
+    pintarCopia(anotada.hecha_en);
+    const mb = (zip.size / 1_048_576).toFixed(1).replace('.', ',');
+    aviso(faltantes.length
+      ? `Copia descargada (${mb} MB), pero faltaron ${faltantes.length} fotos. Está anotado en LEEME.txt.`
+      : `Copia descargada: ${reportes.length} reportes y ${archivosFotos.length} fotos (${mb} MB).`,
+      faltantes.length > 0);
+  } catch (err) {
+    if (!siSeCortoLaSesion(err)) aviso('No se pudo armar la copia. ' + err.message, true);
+    estado.textContent = 'La copia no se completó. Probá de nuevo.';
+  } finally {
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
+});
 
 // ---------------------------------------------------------------------
 // Al abrir: si ya hay sesión, directo a los pendientes

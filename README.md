@@ -19,8 +19,9 @@ En línea: https://riesgo-ambiental-sanitaro.vercel.app
 | `pruebas/` | Pruebas de `/api` y un servidor local que imita a Vercel |
 | `neon/schema.sql` | Tabla, permisos, reglas, topes, vista pública y fotos |
 | `neon/riesgo.sql` | Índice de riesgo y capas de contexto |
-| `neon/moderacion.sql` | Rol `moderador` y tope de intentos de entrada al panel |
+| `neon/moderacion.sql` | Rol `moderador`, tope de intentos de entrada y registro de copias de seguridad |
 | `admin.html`, `admin.js`, `admin.css` | Panel de moderación (`/admin`) |
+| `admin-zip.js` | Arma el ZIP de la copia de seguridad en el navegador |
 | `scripts/` | Recortes de las capas al Gran Resistencia (ver `scripts/README.md`) |
 
 ## Puesta en marcha
@@ -37,7 +38,7 @@ Cada `git push` a `main` vuelve a desplegar solo.
 
 Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` cargados:
 
-- `npm test`: prueba las funciones de `/api`, incluidos los intentos de abuso.
+- `npm test`: prueba las funciones de `/api` y `/api/admin`, incluidos los intentos de abuso.
 - `npm run local`: sirve la página y `/api` en `http://localhost:8000`, con las mismas cabeceras que Vercel.
 
 ## Cómo funciona la seguridad
@@ -65,6 +66,19 @@ Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la 
 - Nota interna por reporte, que nunca se publica.
 
 Lo publicado puede tardar un par de minutos en verse en el mapa: la CDN de Vercel guarda la lista unos minutos.
+
+### Copia de seguridad
+
+El botón **Descargar copia de seguridad** del panel baja un ZIP a la compu con:
+
+- `reportes.geojson`: todos los reportes con todos sus datos y las coordenadas completas. Se abre en QGIS y es la fuente para restaurar.
+- `reportes.csv`: lo mismo para Excel (punto y coma, coma decimal, fechas en hora de Argentina). Los textos del vecino que empiezan con `=`, `+`, `-` o `@` llevan un apóstrofo adelante para que Excel no los ejecute como fórmula.
+- `fotos/<id>.jpg`: todas las fotos, aprobadas o no.
+- `LEEME.txt`: qué es cada cosa y cómo restaurar.
+
+El ZIP se arma en el navegador porque Vercel no deja que una función devuelva más de 4,5 MB. Con muchas fotos, conviene hacerla desde la compu. El panel avisa en amarillo si pasa una semana sin copia.
+
+**La copia es privada:** tiene fotos sin aprobar, descripciones y ubicaciones exactas, también de los descartados. Guardala en la compu o en Drive, nunca en el repositorio, que es público.
 
 **Seguridad del panel:**
 - La sesión es una cookie firmada, válida 8 horas, que solo viaja a `/api/admin`, no la puede leer JavaScript y no se manda desde otros sitios. Cambiar `ADMIN_CLAVE` cierra todas las sesiones.
@@ -109,7 +123,7 @@ Si el envío falla por falta de conexión o por un error del servidor, el report
 - 1 GB por proyecto. Las fotos comparten ese espacio: a 200 KB cada una entran unas 4000.
 - 5 GB de tráfico de salida por mes. La foto solo se descarga al tocar un punto, y la CDN de Vercel guarda unos minutos la lista del mapa, las fotos y los índices, así que la mayoría de las visitas ni despiertan la base.
 - 100 horas de cómputo por mes. La base se duerme tras 5 minutos sin uso y despierta sola en el primer pedido, así que no hay que reactivarla a mano.
-- No hay copias de seguridad automáticas: conviene exportar un CSV cada tanto.
+- No hay copias de seguridad automáticas: Neon gratis solo vuelve atrás 6 horas. La copia se descarga desde el panel y depende de que alguien la haga; el panel avisa si pasa una semana.
 
 ## Pendiente para próximas versiones
 

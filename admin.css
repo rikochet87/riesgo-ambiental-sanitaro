@@ -36,6 +36,18 @@ body.admin { display: block; height: auto; min-height: 100%; overflow: auto; }
 /* ---------- Panel ---------- */
 .panel { max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; }
 
+.copia {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
+  margin-bottom: 14px; padding: 12px 14px; background: #fff;
+  border: 1px solid var(--borde); border-radius: var(--radio-l);
+}
+.copia-texto { display: grid; gap: 2px; font-size: 15px; }
+.copia-texto span { color: var(--texto-suave); }
+.copia.vencida { border-color: var(--lapacho); background: var(--lapacho-claro); }
+.copia.vencida .copia-texto span { color: #6b4f12; font-weight: 600; }
+.copia .btn-claro { min-height: 44px; padding: 0 16px; }
+@media (max-width: 520px) { .copia .btn-claro { width: 100%; } }
+
 .filtros { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .filtros::-webkit-scrollbar { display: none; }
 .filtros button {

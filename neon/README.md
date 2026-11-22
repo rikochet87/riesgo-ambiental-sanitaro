@@ -26,7 +26,7 @@ esquema `auth` que creó la Data API: solo tiene funciones auxiliares, sin datos
 
 1. `schema.sql` (crea el rol `anonymous` si falta)
 2. `riesgo.sql`
-3. `moderacion.sql` (rol `moderador` del panel `/admin` y tope de intentos de entrada)
+3. `moderacion.sql` (rol `moderador` del panel `/admin`, tope de intentos de entrada y registro de copias de seguridad)
 
 ## Qué puede hacer el público
 
@@ -78,6 +78,6 @@ Estados: `pendiente`, `verificado` (rojo), `en_gestion` (amarillo),
 
 - La base se duerme a los 5 minutos sin uso y despierta sola en el primer
   pedido: el primero del día tarda un segundo más.
-- No hay copia de seguridad automática. Pendiente: respaldo semanal a CSV.
+- El plan gratis solo permite volver atrás 6 horas y guardar 1 snapshot manual. La copia de seguridad se descarga desde el panel `/admin` (ZIP con GeoJSON, CSV y fotos).
 - 1 GB de base y 5 GB de tráfico por mes. Con fotos de 200 KB eso es del
   orden de 5000 reportes con foto.

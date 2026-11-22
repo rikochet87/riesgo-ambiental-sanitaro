@@ -14,12 +14,14 @@ import * as riesgo from '../api/riesgo.js';
 import * as adminEntrar from '../api/admin/entrar.js';
 import * as adminReportes from '../api/admin/reportes.js';
 import * as adminFoto from '../api/admin/foto.js';
+import * as adminExportar from '../api/admin/exportar.js';
 
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 const PUERTO = Number(process.env.PORT || 8000);
 const FUNCIONES = {
   '/api/reportes': reportes, '/api/foto': foto, '/api/riesgo': riesgo,
   '/api/admin/entrar': adminEntrar, '/api/admin/reportes': adminReportes, '/api/admin/foto': adminFoto,
+  '/api/admin/exportar': adminExportar,
 };
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',

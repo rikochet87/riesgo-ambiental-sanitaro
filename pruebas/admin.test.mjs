@@ -10,6 +10,7 @@ import * as fotoPublica from '../api/foto.js';
 import * as entrar from '../api/admin/entrar.js';
 import * as moderar from '../api/admin/reportes.js';
 import * as fotoAdmin from '../api/admin/foto.js';
+import * as exportar from '../api/admin/exportar.js';
 
 const SITIO = 'https://riesgo-ambiental-sanitaro.vercel.app';
 const CLAVE = 'una-clave-de-prueba-larga';
@@ -56,6 +57,7 @@ beforeEach(async () => {
 after(async () => {
   await admin('truncate public.reportes cascade');
   await admin('truncate public.admin_intentos');
+  await admin('truncate public.admin_copias');
 });
 
 test('sin ADMIN_CLAVE, o con una de menos de 12 caracteres, el panel no abre', async () => {
@@ -194,6 +196,72 @@ test('10 claves incorrectas bloquean la entrada 15 minutos, aunque después veng
   assert.equal(r.estado, 429);
   assert.equal(r.cuerpo.code, 'BLOQUEADO');
   assert.equal(r.cookie, null);
+});
+
+test('copia de seguridad: sin sesión no hay nada; con sesión, todos los datos y coordenadas completas', async () => {
+  await admin('truncate public.admin_copias');
+  assert.equal((await exportar.GET(pedir('/api/admin/exportar'))).status, 401);
+
+  const cookie = await sesion();
+  const r = await leer(await exportar.GET(pedir('/api/admin/exportar?pagina=0', { cookie })));
+  assert.equal(r.estado, 200);
+  assert.match(r.cache, /no-store/);
+  assert.equal(r.cuerpo.hay_mas, false);
+  assert.equal(r.cuerpo.reportes.length, 2);
+  const conFoto = r.cuerpo.reportes.find((x) => x.id === ID_FOTO);
+  assert.equal(conFoto.lat, -27.46, 'la copia no redondea');
+  assert.match(conFoto.descripcion, /junto al canal/);
+  for (const campo of ['creado_en', 'estado', 'tipo', 'tamano', 'quema', 'cerca_agua', 'cerca_escuela', 'antiguedad',
+                       'tiene_foto', 'foto_aprobada', 'foto_bytes', 'revisado_en', 'nota_admin']) {
+    assert.ok(campo in conFoto, `falta ${campo}`);
+  }
+  assert.equal(r.cuerpo.reportes.find((x) => x.id === ID_SIN_FOTO).foto_bytes, null);
+  assert.equal((await exportar.GET(pedir('/api/admin/exportar?pagina=-1', { cookie }))).status, 400);
+});
+
+test('copia de seguridad: pagina de a 1000 sin perder ni repetir reportes', async () => {
+  // 1001 reportes extra, salteando el trigger (su tope por hora es justamente para esto)
+  await admin(`set session_replication_role = replica;
+    insert into public.reportes (id, lat, lon, creado_en)
+    select gen_random_uuid(), -27.4, -58.9, now() - (n || ' seconds')::interval from generate_series(1, 1001) n;
+    set session_replication_role = origin;`);
+  try {
+    const cookie = await sesion();
+    const p0 = await leer(await exportar.GET(pedir('/api/admin/exportar?pagina=0', { cookie })));
+    const p1 = await leer(await exportar.GET(pedir('/api/admin/exportar?pagina=1', { cookie })));
+    assert.equal(p0.cuerpo.reportes.length, 1000);
+    assert.equal(p0.cuerpo.hay_mas, true);
+    assert.equal(p1.cuerpo.reportes.length, 3);
+    assert.equal(p1.cuerpo.hay_mas, false);
+    const ids = new Set([...p0.cuerpo.reportes, ...p1.cuerpo.reportes].map((x) => x.id));
+    assert.equal(ids.size, 1003);
+  } finally {
+    await admin(`delete from public.reportes where id not in ($1, $2)`, [ID_FOTO, ID_SIN_FOTO]);
+  }
+});
+
+test('copia de seguridad: se anota y la lista del panel muestra la última', async () => {
+  await admin('truncate public.admin_copias');
+  const cookie = await sesion();
+  const antes = await leer(await moderar.GET(pedir('/api/admin/reportes', { cookie })));
+  assert.equal(antes.cuerpo.ultima_copia, null);
+
+  const otro = await exportar.POST(pedir('/api/admin/exportar',
+    { metodo: 'POST', cuerpo: { reportes: 2, fotos: 1 }, cookie, origen: 'https://otro-sitio.com' }));
+  assert.equal(otro.status, 403);
+  assert.equal((await exportar.POST(pedir('/api/admin/exportar',
+    { metodo: 'POST', cuerpo: { reportes: -1, fotos: 0 }, cookie, origen: SITIO }))).status, 400);
+
+  const r = await leer(await exportar.POST(pedir('/api/admin/exportar',
+    { metodo: 'POST', cuerpo: { reportes: 2, fotos: 1 }, cookie, origen: SITIO })));
+  assert.equal(r.estado, 201);
+  const despues = await leer(await moderar.GET(pedir('/api/admin/reportes', { cookie })));
+  assert.ok(despues.cuerpo.ultima_copia);
+
+  await assert.rejects(ejecutorLocal('anonymous', [['select * from public.admin_copias', []]]),
+                       (e) => e.code === '42501', 'el público no ve las copias');
+  await assert.rejects(ejecutorLocal('moderador', [['delete from public.admin_copias', []]]),
+                       (e) => e.code === '42501', 'el moderador no borra el registro');
 });
 
 test('salir vence la cookie', async () => {

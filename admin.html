@@ -46,6 +46,14 @@
 
   <!-- Panel -->
   <main id="panel" class="panel" hidden>
+    <section id="copia" class="copia" aria-live="polite">
+      <div class="copia-texto">
+        <b>Copia de seguridad</b>
+        <span id="copia-estado">Todavía no se descargó ninguna copia.</span>
+      </div>
+      <button id="btn-copia" class="btn-claro">Descargar copia de seguridad</button>
+    </section>
+
     <nav class="filtros" aria-label="Estados">
       <button data-estado="pendiente" aria-pressed="true">Pendientes <b data-n="pendiente">0</b></button>
       <button data-estado="verificado" aria-pressed="false">Activos <b data-n="verificado">0</b></button>
