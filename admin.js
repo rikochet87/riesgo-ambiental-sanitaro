@@ -17,9 +17,6 @@ const TAMANOS = {
 const ANTIGUEDADES = { dias: 'Días', semanas: 'Semanas', meses: 'Meses', mas_de_un_anio: 'Más de un año', no_se: 'No sabe' };
 
 const $ = (id) => document.getElementById(id);
-let filtro = 'pendiente';
-let cantidades = {};
-let pedidoActual = 0;   // para descartar respuestas que llegan tarde
 
 // ---------------------------------------------------------------------
 // Conexión
@@ -82,7 +79,7 @@ $('form-entrada').addEventListener('submit', async (e) => {
   try {
     await api('/entrar', { method: 'POST', body: JSON.stringify({ clave: form.clave.value }) });
     form.clave.value = '';
-    await cargar(filtro);
+    await cargarTodo();
   } catch (err) {
     mostrarEntrada(err.message);
   } finally {
@@ -92,58 +89,222 @@ $('form-entrada').addEventListener('submit', async (e) => {
 
 $('btn-salir').addEventListener('click', async () => {
   try { await api('/entrar', { method: 'DELETE' }); } catch { /* igual se sale */ }
+  reportes = [];
+  seleccionado = null;
+  capaPuntos?.clearLayers();
+  anillo?.remove();
   $('lista').replaceChildren();
+  $('ficha').replaceChildren();
   mostrarEntrada();
 });
 
 // ---------------------------------------------------------------------
-// Lista
+// Visor: todos los reportes en el mapa, en sus coordenadas exactas
 // ---------------------------------------------------------------------
-document.querySelectorAll('.filtros button').forEach((b) =>
-  b.addEventListener('click', () => cargar(b.dataset.estado)));
+const COLORES = {
+  pendiente: '#3b5bdb', verificado: '#e03131', en_gestion: '#f59f00', resuelto: '#2f9e44', descartado: '#868e96',
+};
+// Orden de dibujo: lo que hay que revisar queda arriba de todo
+const ORDEN_DIBUJO = ['descartado', 'resuelto', 'en_gestion', 'verificado', 'pendiente'];
+const CENTRO = [-27.4606, -58.9839];
+const ALTO_HOJA_BAJA = 118;
+
+let reportes = [];
+let cantidades = {};
+let seleccionado = null;
+let copiaAtrasada = false;
+const visibles = new Set(['pendiente', 'verificado', 'en_gestion', 'resuelto']);   // descartados, apagados
+let mapa = null;
+let capaPuntos = null;
+let anillo = null;
+let yaEncuadrado = false;
+
+const esCelular = () => matchMedia('(max-width: 899.98px)').matches;
+const formatoCorto = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+});
+
+function crearMapa() {
+  if (mapa) return;
+  mapa = L.map('visor', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView(CENTRO, 13);
+  L.control.attribution({ position: 'topleft', prefix: false }).addTo(mapa);
+  const calles = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: 'Mapa &copy; Esri &mdash; &copy; OpenStreetMap' },
+  ).addTo(mapa);
+  const satelite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { maxZoom: 19, attribution: 'Imágenes &copy; Esri' },
+  );
+  L.control.layers({ Mapa: calles, 'Satélite': satelite }, null, { position: 'topright' }).addTo(mapa);
+  L.control.zoom({ position: 'topright' }).addTo(mapa);
+  capaPuntos = L.layerGroup().addTo(mapa);
+}
+
+async function cargarTodo({ alAbrir = false } = {}) {
+  const todos = [];
+  try {
+    for (let pagina = 0; ; pagina++) {
+      const datos = await api(`/reportes?estado=todos&pagina=${pagina}`);
+      if (pagina === 0) { cantidades = datos.cantidades; pintarCopia(datos.ultima_copia); }
+      todos.push(...datos.reportes);
+      if (!datos.hay_mas) break;
+    }
+  } catch (err) {
+    // Al abrir la página sin sesión no "venció" nada: solo pedir la clave
+    if (alAbrir && err.status === 401) { mostrarEntrada(); return; }
+    if (!siSeCortoLaSesion(err)) aviso('No se pudieron cargar los reportes. ' + err.message, true);
+    return;
+  }
+  reportes = todos;
+  mostrarPanel();
+  crearMapa();
+  mapa.invalidateSize();
+  pintarCantidades();
+  dibujarPuntos();
+  pintarLista();
+  if (!yaEncuadrado) { encuadrar(); yaEncuadrado = true; }
+}
+
+function encuadrar() {
+  const puntos = reportes.filter((r) => visibles.has(r.estado)).map((r) => [r.lat, r.lon]);
+  if (!puntos.length) return;
+  mapa.fitBounds(puntos, {
+    maxZoom: 15, paddingTopLeft: [40, 40], paddingBottomRight: [40, esCelular() ? ALTO_HOJA_BAJA + 30 : 40],
+  });
+}
+
+function dibujarPuntos() {
+  capaPuntos.clearLayers();
+  for (const estado of ORDEN_DIBUJO) {
+    if (!visibles.has(estado)) continue;
+    for (const r of reportes) {
+      if (r.estado !== estado) continue;
+      const pendiente = estado === 'pendiente';
+      const descartado = estado === 'descartado';
+      const punto = L.circleMarker([r.lat, r.lon], {
+        radius: pendiente ? 9 : 7,
+        weight: pendiente ? 3 : 2,
+        color: descartado ? COLORES.descartado : '#fff',
+        fillColor: COLORES[estado],
+        fillOpacity: descartado ? 0.3 : 1,
+      });
+      punto.bindTooltip(`${ESTADOS[estado]}, ${formatoCorto.format(new Date(r.creado_en))}`,
+        { direction: 'top', offset: [0, -8], className: 'etiqueta-reporte' });
+      punto.on('click', () => seleccionar(r.id, { desdeMapa: true }));
+      punto.addTo(capaPuntos);
+    }
+  }
+  marcarSeleccion();
+}
+
+function marcarSeleccion() {
+  anillo?.remove();
+  anillo = null;
+  const r = reportes.find((x) => x.id === seleccionado);
+  if (!r) return;
+  anillo = L.circleMarker([r.lat, r.lon], {
+    radius: 16, weight: 3, color: '#1b2418', fill: false, interactive: false,
+  }).addTo(mapa);
+}
+
+// Capas por estado: se prenden y apagan
+document.querySelectorAll('.filtros button').forEach((b) => b.addEventListener('click', () => {
+  const estado = b.dataset.estado;
+  if (visibles.has(estado)) visibles.delete(estado); else visibles.add(estado);
+  b.setAttribute('aria-pressed', String(visibles.has(estado)));
+  dibujarPuntos();
+  pintarLista();
+}));
 
 function pintarCantidades() {
   for (const el of document.querySelectorAll('[data-n]')) el.textContent = cantidades[el.dataset.n] ?? 0;
+  pintarResumen();
 }
 
-function mostrarVacio() {
-  const hay = $('lista').children.length > 0;
-  $('vacio').hidden = hay;
-  $('vacio').textContent = hay ? ''
-    : filtro === 'pendiente' ? 'No hay reportes pendientes de revisión.'
-    : `No hay reportes en «${ESTADOS[filtro]}».`;
+function pintarResumen() {
+  const n = cantidades.pendiente || 0;
+  let texto = n === 0 ? 'No hay reportes para revisar' : n === 1 ? '1 reporte para revisar' : `${n} reportes para revisar`;
+  if (copiaAtrasada) texto += ', copia de seguridad atrasada';
+  $('resumen').textContent = texto;
 }
 
-async function cargar(estado, { alAbrir = false } = {}) {
-  filtro = estado;
-  const este = ++pedidoActual;
-  document.querySelectorAll('.filtros button').forEach((b) =>
-    b.setAttribute('aria-pressed', String(b.dataset.estado === estado)));
-  // Nunca dejar a la vista tarjetas de otra pestaña mientras carga esta:
-  // se podría publicar o descartar una creyendo que es de esta lista.
-  $('lista').replaceChildren();
-  $('vacio').textContent = 'Cargando…';
-  $('vacio').hidden = false;
+function pintarLista() {
+  const filas = reportes.filter((r) => visibles.has(r.estado));
+  $('lista').replaceChildren(...filas.map(fila));
+  $('vacio').hidden = filas.length > 0;
+  $('vacio').textContent = reportes.length ? 'No hay reportes en las capas prendidas.' : 'Todavía no llegó ningún reporte.';
+}
 
-  let datos;
-  try {
-    datos = await api(`/reportes?estado=${encodeURIComponent(estado)}`);
-  } catch (err) {
-    if (este !== pedidoActual) return;
-    // Al abrir la página sin sesión no "venció" nada: solo pedir la clave
-    if (alAbrir && err.status === 401) { mostrarEntrada(); return; }
-    if (!siSeCortoLaSesion(err)) aviso('No se pudo cargar la lista. ' + err.message, true);
-    return;
+function fila(r) {
+  const boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'fila';
+  boton.dataset.estado = r.estado;
+  boton.dataset.id = r.id;
+  const titulo = document.createElement('span');
+  titulo.className = 'fila-titulo';
+  titulo.textContent = ESTADOS[r.estado];
+  const fecha = document.createElement('time');
+  fecha.dateTime = r.creado_en;
+  fecha.textContent = formatoCorto.format(new Date(r.creado_en));
+  const detalle = document.createElement('span');
+  detalle.className = 'fila-detalle';
+  detalle.textContent = [r.tipo && TIPOS[r.tipo], r.tamano && TAMANOS[r.tamano],
+    r.tiene_foto && 'con foto', r.quema && 'lo queman'].filter(Boolean).join(', ') || 'Sin datos del lugar';
+  boton.append(document.createElement('i'), titulo, fecha, detalle);
+  boton.addEventListener('click', () => seleccionar(r.id));
+  const li = document.createElement('li');
+  li.append(boton);
+  return li;
+}
+
+// Hoja del celular: baja (solo capas), media (ficha con el mapa a la vista) o alta (lista)
+function altura(valor) {
+  $('lateral').dataset.altura = valor;
+  $('asa').setAttribute('aria-expanded', String(valor !== 'baja'));
+}
+$('asa').addEventListener('click', () => altura($('lateral').dataset.altura === 'baja' ? 'alta' : 'baja'));
+
+// Pone el punto en el centro de la parte del mapa que no tapa la hoja
+function centrarEn(r, { acercar }) {
+  const zoom = acercar ? Math.max(mapa.getZoom(), 16) : mapa.getZoom();
+  let tapado = 0;
+  if (esCelular()) {
+    const panel = $('panel').clientHeight;
+    const valor = $('lateral').dataset.altura;
+    tapado = valor === 'media' ? panel * 0.6 : valor === 'alta' ? panel * 0.86 : ALTO_HOJA_BAJA;
   }
-  // Si mientras tanto se eligió otra pestaña, esta respuesta ya no corresponde
-  if (este !== pedidoActual) return;
-  mostrarPanel();
-  cantidades = datos.cantidades;
-  pintarCantidades();
-  pintarCopia(datos.ultima_copia);
-  $('lista').replaceChildren(...datos.reportes.map(tarjeta));
-  mostrarVacio();
+  const centro = mapa.project([r.lat, r.lon], zoom).add([0, tapado / 2]);
+  mapa.setView(mapa.unproject(centro, zoom), zoom, { animate: true });
 }
+
+function seleccionar(id, { desdeMapa = false } = {}) {
+  const r = reportes.find((x) => x.id === id);
+  if (!r) return;
+  seleccionado = id;
+  $('ficha').replaceChildren(tarjeta(r));
+  $('vista-lista').hidden = true;
+  $('vista-ficha').hidden = false;
+  $('vista-ficha').scrollTop = 0;
+  marcarSeleccion();
+  if (esCelular()) altura('media');
+  centrarEn(r, { acercar: !desdeMapa });
+}
+
+function volverALista() {
+  seleccionado = null;
+  marcarSeleccion();
+  $('vista-ficha').hidden = true;
+  $('ficha').replaceChildren();
+  $('vista-lista').hidden = false;
+  pintarLista();
+  if (esCelular()) altura('alta');
+}
+$('btn-volver').addEventListener('click', volverALista);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('vista-ficha').hidden) volverALista();
+});
 
 const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires',
@@ -278,14 +439,11 @@ async function accion(el, r, boton) {
       cantidades[r.estado] = (cantidades[r.estado] || 0) + 1;
       pintarCantidades();
     }
-    if (r.estado !== filtro) {
-      el.remove();
-      mostrarVacio();
-    } else {
-      pintarEstado(el, r);
-      if (!r.tiene_foto) el.querySelector('.foto').replaceChildren();
-      pintarFoto(el, r);
-    }
+    // La ficha queda abierta con el estado nuevo; el punto cambia de color en el mapa
+    pintarEstado(el, r);
+    if (!r.tiene_foto) el.querySelector('.foto').replaceChildren();
+    pintarFoto(el, r);
+    dibujarPuntos();
     aviso(mensaje);
   } catch (err) {
     if (!siSeCortoLaSesion(err)) aviso('No se pudo guardar. ' + err.message, true);
@@ -312,6 +470,8 @@ function pintarCopia(ultima) {
   if (!ultima) {
     estado.textContent = 'Todavía no se descargó ninguna copia.';
     caja.classList.add('vencida');
+    copiaAtrasada = true;
+    pintarResumen();
     return;
   }
   const dias = Math.floor((Date.now() - new Date(ultima)) / 86_400_000);
@@ -320,6 +480,8 @@ function pintarCopia(ultima) {
     : `Última: hace ${dias} días (${fechaHoraAR(ultima).split(',')[0]})`;
   if (dias >= DIAS_PARA_AVISAR) estado.textContent += '. Conviene hacer una nueva.';
   caja.classList.toggle('vencida', dias >= DIAS_PARA_AVISAR);
+  copiaAtrasada = dias >= DIAS_PARA_AVISAR;
+  pintarResumen();
 }
 
 // Para Excel en español: punto y coma entre columnas y coma decimal
@@ -499,4 +661,4 @@ $('btn-copia').addEventListener('click', async () => {
 // ---------------------------------------------------------------------
 // Al abrir: si ya hay sesión, directo a los pendientes
 // ---------------------------------------------------------------------
-cargar('pendiente', { alAbrir: true });
+cargarTodo({ alAbrir: true });

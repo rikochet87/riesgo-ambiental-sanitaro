@@ -1,4 +1,4 @@
-// GET   /api/admin/reportes?estado=pendiente  → reportes de ese estado (o "todos")
+// GET   /api/admin/reportes?estado=todos&pagina=0  → reportes de ese estado (o todos), de a 1000
 // PATCH /api/admin/reportes {id, estado?, foto_aprobada?, quitar_foto?, nota_admin?}
 // Todo con el rol moderador, y solo con la sesión abierta.
 import { comoModerador } from '../_db.js';
@@ -6,13 +6,17 @@ import { json, malPedido, errorDeBase, UUID } from '../_http.js';
 import { controlar, leerJSON } from '../_admin.js';
 
 const ESTADOS = ['pendiente', 'verificado', 'en_gestion', 'resuelto', 'descartado'];
+const POR_PAGINA = 1000;
 
 export async function GET(request) {
   const corte = controlar(request);
   if (corte) return corte;
 
-  const estado = new URL(request.url).searchParams.get('estado') || 'pendiente';
+  const parametros = new URL(request.url).searchParams;
+  const estado = parametros.get('estado') || 'pendiente';
   if (estado !== 'todos' && !ESTADOS.includes(estado)) return malPedido('Estado desconocido.');
+  const pagina = Number(parametros.get('pagina') || 0);
+  if (!Number.isInteger(pagina) || pagina < 0) return malPedido('Página inválida.');
 
   try {
     const [filas, conteo, [copia]] = await comoModerador([
@@ -21,14 +25,15 @@ export async function GET(request) {
                revisado_en, nota_admin
         from public.reportes
         where $1 = 'todos' or estado = $1
-        order by creado_en desc
-        limit 300`, [estado]],
+        order by creado_en desc, id
+        limit $2 offset $3`, [estado, POR_PAGINA + 1, pagina * POR_PAGINA]],
       ['select estado, count(*)::int as n from public.reportes group by estado', []],
       ['select max(hecha_en) as ultima from public.admin_copias', []],
     ]);
     const cantidades = Object.fromEntries(ESTADOS.map((e) => [e, 0]));
     for (const { estado: e, n } of conteo) cantidades[e] = n;
-    return json({ reportes: filas, cantidades, ultima_copia: copia?.ultima ?? null });
+    return json({ reportes: filas.slice(0, POR_PAGINA), hay_mas: filas.length > POR_PAGINA,
+                  cantidades, ultima_copia: copia?.ultima ?? null });
   } catch (err) {
     return errorDeBase(err);
   }

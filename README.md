@@ -56,14 +56,15 @@ Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` car
 
 ## Moderar
 
-Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la clave `ADMIN_CLAVE`. Está pensado para el celular:
+Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la clave `ADMIN_CLAVE`. Es un visor GIS:
 
-- Pestañas por estado: pendientes, activos (rojo), en gestión (amarillo), resueltos (verde) y descartados.
-- Cada reporte muestra la foto (aunque no esté aprobada), los datos del relevamiento, la descripción y un enlace a su ubicación en Google Maps.
-- **Publicar** pasa un pendiente a activo, con o sin su foto. **Descartar** lo saca del circuito sin borrarlo.
-- En los ya revisados se cambia el estado y se publica o despublica la foto.
+- **Mapa con todos los reportes** en sus coordenadas exactas (el mapa público las redondea), coloreados por estado. Los pendientes, en azul índigo, se dibujan más grandes y por encima. Mapa base de calles o satélite.
+- **Capas por estado** que se prenden y apagan: pendientes, activos (rojo), en gestión (amarillo), resueltos (verde) y descartados (gris, apagados al abrir). La lista sigue a las capas prendidas.
+- **Tocar un punto** (o una fila de la lista) abre su ficha: foto aunque no esté aprobada, datos del relevamiento, descripción, enlace a Google Maps y los botones de moderar. El punto queda marcado con un anillo. `Esc` vuelve a la lista.
+- **Publicar** pasa un pendiente a activo, con o sin su foto; el punto cambia de color en el acto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado y se publica o despublica la foto.
 - **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
 - Nota interna por reporte, que nunca se publica.
+- En la compu, el panel va a la izquierda y el mapa a la derecha. En el celular, el mapa ocupa la pantalla y el panel es una hoja que sube desde abajo: baja (resumen y capas), media (ficha con el punto a la vista) o alta (lista).
 
 Lo publicado puede tardar un par de minutos en verse en el mapa: la CDN de Vercel guarda la lista unos minutos.
 

@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="temas/tema-monte.css">
   <link rel="stylesheet" href="admin.css">
@@ -44,26 +46,42 @@
     </form>
   </main>
 
-  <!-- Panel -->
+  <!-- Panel: visor con todos los reportes -->
   <main id="panel" class="panel" hidden>
-    <section id="copia" class="copia" aria-live="polite">
-      <div class="copia-texto">
-        <b>Copia de seguridad</b>
-        <span id="copia-estado">Todavía no se descargó ninguna copia.</span>
-      </div>
-      <button id="btn-copia" class="btn-claro">Descargar copia de seguridad</button>
-    </section>
+    <div id="visor" class="visor" aria-label="Mapa de reportes"></div>
 
-    <nav class="filtros" aria-label="Estados">
-      <button data-estado="pendiente" aria-pressed="true">Pendientes <b data-n="pendiente">0</b></button>
-      <button data-estado="verificado" aria-pressed="false">Activos <b data-n="verificado">0</b></button>
-      <button data-estado="en_gestion" aria-pressed="false">En gestión <b data-n="en_gestion">0</b></button>
-      <button data-estado="resuelto" aria-pressed="false">Resueltos <b data-n="resuelto">0</b></button>
-      <button data-estado="descartado" aria-pressed="false">Descartados <b data-n="descartado">0</b></button>
-    </nav>
-    <p class="suave nota-mapa">Lo que publiques puede tardar un par de minutos en verse en el mapa.</p>
-    <div id="lista" class="lista" aria-live="polite"></div>
-    <p id="vacio" class="vacio" hidden></p>
+    <aside id="lateral" class="lateral" data-altura="baja">
+      <button id="asa" class="asa" aria-expanded="false" aria-controls="lateral">
+        <span class="asa-barra" aria-hidden="true"></span>
+        <span id="resumen" class="resumen"></span>
+      </button>
+
+      <nav class="filtros" aria-label="Capas por estado">
+        <button data-estado="pendiente" aria-pressed="true"><i aria-hidden="true"></i>Pendientes <b data-n="pendiente">0</b></button>
+        <button data-estado="verificado" aria-pressed="true"><i aria-hidden="true"></i>Activos <b data-n="verificado">0</b></button>
+        <button data-estado="en_gestion" aria-pressed="true"><i aria-hidden="true"></i>En gestión <b data-n="en_gestion">0</b></button>
+        <button data-estado="resuelto" aria-pressed="true"><i aria-hidden="true"></i>Resueltos <b data-n="resuelto">0</b></button>
+        <button data-estado="descartado" aria-pressed="false"><i aria-hidden="true"></i>Descartados <b data-n="descartado">0</b></button>
+      </nav>
+
+      <div id="vista-lista" class="vista">
+        <section id="copia" class="copia" aria-live="polite">
+          <div class="copia-texto">
+            <b>Copia de seguridad</b>
+            <span id="copia-estado">Todavía no se descargó ninguna copia.</span>
+          </div>
+          <button id="btn-copia" class="btn-claro">Descargar copia de seguridad</button>
+        </section>
+        <p class="suave nota-mapa">Lo que publiques puede tardar un par de minutos en verse en el mapa público.</p>
+        <ol id="lista" class="lista-filas"></ol>
+        <p id="vacio" class="vacio" hidden></p>
+      </div>
+
+      <div id="vista-ficha" class="vista" hidden>
+        <button id="btn-volver" class="btn-volver">Volver a la lista</button>
+        <div id="ficha"></div>
+      </div>
+    </aside>
   </main>
 
   <template id="plantilla-tarjeta">
@@ -111,6 +129,8 @@
   </template>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module" src="admin.js"></script>
 </body>
 </html>
