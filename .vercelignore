@@ -1,0 +1,6 @@
+# Lo que no es parte de la página: queda en GitHub, no se publica.
+datos/
+scripts/
+docs/
+neon/
+README.md
