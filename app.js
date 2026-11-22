@@ -76,7 +76,12 @@ async function cargarReportesPublicos() {
     const marcador = L.circleMarker([r.lat, r.lon], {
       radius: 10, color: '#fff', weight: 3, fillColor: color, fillOpacity: 1,
     });
-    marcador.bindPopup(htmlPopup(r, null), { maxWidth: 300, minWidth: 260, autoPanPadding: [16, 70] });
+    marcador.bindPopup(htmlPopup(r, null), {
+      maxWidth: 300, minWidth: 260,
+      // Abajo está el panel de la leyenda y el botón (unos 120 px): el popup se
+      // acomoda por encima. Si no entra entero, Leaflet prioriza que se vea el borde de arriba.
+      autoPanPaddingTopLeft: [16, 16], autoPanPaddingBottomRight: [16, 130],
+    });
     marcador.on('popupopen', async () => { await cargarRiesgo(marcador, r); cargarFoto(marcador, r); });
     marcador.addTo(capaPublica);
   }
@@ -89,14 +94,23 @@ const cacheRiesgo = new Map();
 const cacheFoto = new Map();
 const COLOR_CLASE = { bajo: '#2f9e44', medio: '#e8590c', alto: '#e03131' };
 
+// El contenido va como elemento y no como texto: cuando llega la foto hay que
+// pedirle a Leaflet que reacomode el popup, y si el contenido fuera texto lo
+// volvería a dibujar desde cero y se perdería la foto ya insertada.
+function nodoPopup(html) {
+  const nodo = document.createElement('div');
+  nodo.innerHTML = html;
+  return nodo;
+}
+
 async function cargarRiesgo(marcador, r) {
-  if (cacheRiesgo.has(r.id)) { marcador.setPopupContent(htmlPopup(r, cacheRiesgo.get(r.id))); return; }
+  if (cacheRiesgo.has(r.id)) { marcador.setPopupContent(nodoPopup(htmlPopup(r, cacheRiesgo.get(r.id)))); return; }
   let riesgo;
   try {
     riesgo = (await pedirRiesgo(r.id)) || { error: true };
     if (!riesgo.error) cacheRiesgo.set(r.id, riesgo);
   } catch (err) { console.warn('No se pudo calcular el índice', err); riesgo = { error: true }; }
-  marcador.setPopupContent(htmlPopup(r, riesgo));
+  marcador.setPopupContent(nodoPopup(htmlPopup(r, riesgo)));
 }
 
 // La foto se pide aparte y solo al abrir el popup, para no cargarla en el mapa
@@ -113,6 +127,8 @@ async function cargarFoto(marcador, r) {
     if (!base64) { hueco.remove(); return; }
     const img = new Image();
     img.alt = 'Foto del basural enviada por un vecino';
+    // La foto agranda el popup hacia arriba: reacomodarlo para que no se salga de la pantalla
+    img.addEventListener('load', () => marcador.getPopup()?.update(), { once: true });
     img.src = `data:image/jpeg;base64,${base64}`;
     hueco.replaceChildren(img);
   } catch (err) {
