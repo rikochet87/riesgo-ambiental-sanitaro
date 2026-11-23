@@ -27,6 +27,7 @@ esquema `auth` que creó la Data API: solo tiene funciones auxiliares, sin datos
 1. `schema.sql` (crea el rol `anonymous` si falta)
 2. `riesgo.sql`
 3. `moderacion.sql` (rol `moderador` del panel `/admin`, tope de intentos de entrada y registro de copias de seguridad)
+4. `capas_contexto.sql` (capas de contexto del índice; lo genera `scripts/06_sql_capas.py` y se puede volver a aplicar: reemplaza cada capa entera)
 
 ## Qué puede hacer el público
 

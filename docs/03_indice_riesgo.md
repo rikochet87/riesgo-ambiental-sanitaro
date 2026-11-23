@@ -21,7 +21,9 @@ Si falta una capa, ese factor queda "sin datos" y su peso se reparte entre los d
 
 ## Datos
 - Satélite: tabla `amenaza_satelital` (area_m2, quemas_12m, crecimiento_pct), la cargará el script de Earth Engine.
-- Contexto (cargar desde QGIS en EPSG:4326): `capa_poblacion`, `capa_escuelas`, `capa_salud`, `capa_agua`, `capa_inundable`.
+- Contexto (EPSG:4326): `capa_poblacion`, `capa_escuelas`, `capa_salud`, `capa_agua`, `capa_inundable`. Se cargan con `neon/capas_contexto.sql` (generado por `scripts/06_sql_capas.py`).
+- Cargadas (2026-11-23): `capa_salud` (42 establecimientos del IGN) y `capa_escuelas` (357 sitios: las 494 escuelas del Mapa Educativo agrupadas a 50 m, para no contar dos veces un edificio con varios turnos o niveles).
+- Ojo al leer cambios: un factor "sin datos" queda fuera del promedio, pero al cargar su capa entra con su valor real, que puede ser bajo. Por eso un reporte puede bajar de puntaje al encenderse una capa (el primer reporte real pasó de 43 a 37: tiene 1 escuela y ningún centro de salud a 300 m).
 - Pesos, radios y umbrales editables en `parametros_riesgo`.
 
 ## Pendiente
