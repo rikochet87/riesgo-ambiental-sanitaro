@@ -17,8 +17,14 @@ Qué hace:
      Lo guarda tal cual en datos/hidrografia/osm_agua.osm (con la fecha).
   2. GDAL, que viene con QGIS, arma los polígonos (también las lagunas con
      islas) y las líneas. Se cortan al rectángulo de la app.
-  3. Junta OSM con el IGN. Un polígono de OSM que cae en más de un 80 % dentro
-     de un polígono del IGN se descarta (es el mismo cuerpo de agua). Las
+  3. Suma las lagunas de las cuencas urbanas de la IDE Chaco (Gobierno del
+     Chaco), si están en datos/hidrografia/ide/: 101 polígonos con tipo
+     (laguna, meandro, arroyo) y régimen (permanente o temporal), en POSGAR 98
+     faja 5; se pasan a EPSG:4326. Los acentos vienen rotos desde el servidor
+     y se corrigen con NOMBRES_IDE.
+  4. Junta todo en este orden: IGN, IDE, OSM. Un polígono que cae en más de
+     un 80 % dentro de lo ya sumado se descarta (es el mismo cuerpo de agua);
+     así, en las lagunas urbanas manda el contorno oficial de la IDE. Las
      líneas de OSM se suman todas: el IGN no tiene líneas acá.
 
 Campos: nombre, tipo (en castellano), regimen (intermitente si OSM lo dice),
@@ -26,15 +32,18 @@ capa ("IGN ..." u "OSM ...").
 
 Salidas (en datos/hidrografia/ y copia en COPIAS):
   agua_osm_gran_resistencia.geojson      solo OSM (para revisar en QGIS)
-  agua_contexto_gran_resistencia.geojson IGN + OSM, para capa_agua (06)
+  agua_contexto_gran_resistencia.geojson IGN + IDE + OSM, para capa_agua (06)
+
+Fuente IDE: http://idechaco.gob.ar/geoserver (capa idechaco:lagunas_cuencas_urbanas,
+pedido WFS GetFeature con salida SHAPE-ZIP), descargada el 2026-11-23.
 
 CÓMO CORRERLO
 -------------
 En QGIS (necesita internet): Complementos > Consola de Python > Mostrar editor
 > abrir este archivo > Ejecutar. Tarda uno o dos minutos. Al terminar agrega
 las dos capas al mapa. No hace falta tener QuickOSM instalado.
-Para volver a usar una descarga ya hecha sin consultar Overpass, poné
-DESCARGAR = False.
+Si ya existe datos/hidrografia/osm_agua.osm, usa esa descarga; para bajar
+datos nuevos de OSM, poné DESCARGAR = True.
 
 Datos de OSM: © colaboradores de OpenStreetMap, licencia ODbL.
 """
@@ -74,7 +83,8 @@ IGN = os.path.join(CARPETA, "agua_gran_resistencia.geojson")          # salida d
 SALIDA_OSM = os.path.join(CARPETA, "agua_osm_gran_resistencia.geojson")
 SALIDA = os.path.join(CARPETA, "agua_contexto_gran_resistencia.geojson")
 COPIAS = LOCALES.get("COPIAS", [])
-DESCARGAR = True
+IDE = os.path.join(CARPETA, "ide", "lagunas_cuencas_urbanas.shp")    # opcional
+DESCARGAR = False    # True: volver a bajar de Overpass aunque ya esté osm_agua.osm
 SOLAPE_REPETIDO = 0.8      # fracción de un polígono OSM dentro del IGN para darlo por repetido
 
 LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = -59.15, -27.62, -58.85, -27.30   # mismo rectángulo que la app
@@ -89,6 +99,28 @@ TIPO_AGUA = {"lake": "Laguna", "lagoon": "Laguna", "pond": "Estanque o laguna ch
              "basin": "Cuenco o reservorio", "wastewater": "Pileta de tratamiento de efluentes",
              "stream": "Arroyo o riacho", "ditch": "Zanja", "drain": "Desagüe a cielo abierto",
              "moat": "Foso", "fishpond": "Estanque de peces"}
+
+
+# El servidor de la IDE manda los acentos rotos ("Concepciï¿½n"): el carácter se
+# perdió, así que se corrigen a mano. También se igualan con OSM tres nombres
+# escritos distinto, para que una laguna no aparezca con dos nombres.
+NOMBRES_IDE = {"Ayo. Arazï¿½": "Arroyo Arazá", "Lag. Concepciï¿½n": "Laguna Concepción",
+               "Lag. Fortï¿½n": "Laguna Fortín", "Lag. Marï¿½a Cristina": "Laguna María Cristina",
+               "Lag. ï¿½valos": "Laguna Ávalos", "Lag. Arguello": "Laguna Argüello",
+               "Lag. Colusi": "Laguna Colussi", "Lag. Hortencia": "Laguna Hortensia"}
+REGIMEN_IDE = {"Permanente": "perenne", "Temporales": "intermitente", "Temporal": "intermitente"}
+
+
+def nombre_ide(nombre):
+    nombre = (nombre or "").strip()
+    if nombre in NOMBRES_IDE:
+        return NOMBRES_IDE[nombre]
+    if "ï¿½" in nombre or "\ufffd" in nombre:
+        print(f"  Aviso: nombre con acentos rotos sin corregir: {nombre!r} (agregalo a NOMBRES_IDE)")
+    for corto, largo in (("Lag. ", "Laguna "), ("Ayo. ", "Arroyo ")):
+        if nombre.startswith(corto):
+            return largo + nombre[len(corto):]
+    return nombre
 
 
 def consulta_overpass():
@@ -265,22 +297,49 @@ def _wkt(geom):
     raise ValueError(t)
 
 
-def juntar(ign, osm):
+def leer_ide():
+    from qgis.core import (QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsGeometry,
+                           QgsProject, QgsVectorLayer)
+    if not os.path.exists(IDE):
+        print("Sin lagunas de la IDE Chaco (falta " + IDE + "): sigo sin ellas.")
+        return []
+    capa = QgsVectorLayer(IDE, "lagunas_ide", "ogr")
+    if not capa.isValid():
+        raise RuntimeError(f"No pude abrir {IDE}")
+    a_4326 = QgsCoordinateTransform(capa.crs(), QgsCoordinateReferenceSystem("EPSG:4326"),
+                                    QgsProject.instance())
+    salida = []
+    for f in capa.getFeatures():
+        g = QgsGeometry(f.geometry())
+        if g.isNull() or g.isEmpty():
+            continue
+        g.transform(a_4326)
+        if not g.isGeosValid():
+            g = g.makeValid()
+        if not g.isMultipart():
+            g.convertToMultiType()
+        salida.append((g, {"nombre": nombre_ide(f["nombre"]), "tipo": (f["tipo"] or "Laguna").strip(),
+                           "regimen": REGIMEN_IDE.get((f["regimen"] or "").strip(), ""),
+                           "capa": "IDE Chaco lagunas_cuencas_urbanas"}))
+    return salida
+
+
+def juntar(*fuentes):
+    """Suma las fuentes en orden; descarta polígonos ya cubiertos en un 80 % o más."""
     from qgis.core import QgsSpatialIndex, QgsFeature, QgsWkbTypes
-    indice = QgsSpatialIndex()
-    for i, (g, _) in enumerate(ign):
-        f = QgsFeature(i); f.setGeometry(g); indice.addFeature(f)
-    juntos, repetidos = list(ign), 0
-    for g, props in osm:
-        if g.type() == QgsWkbTypes.PolygonGeometry and g.area() > 0:
-            dentro = 0.0
-            for i in indice.intersects(g.boundingBox()):
-                if ign[i][0].intersects(g):
-                    dentro += ign[i][0].intersection(g).area()
-            if dentro >= SOLAPE_REPETIDO * g.area():
-                repetidos += 1
-                continue
-        juntos.append((g, props))
+    indice, juntos, repetidos = QgsSpatialIndex(), [], [0] * len(fuentes)
+    for k, fuente in enumerate(fuentes):
+        for g, props in fuente:
+            if g.type() == QgsWkbTypes.PolygonGeometry and g.area() > 0:
+                dentro = 0.0
+                for i in indice.intersects(g.boundingBox()):
+                    if juntos[i][0].intersects(g):
+                        dentro += juntos[i][0].intersection(g).area()
+                if dentro >= SOLAPE_REPETIDO * g.area():
+                    repetidos[k] += 1
+                    continue
+                f = QgsFeature(len(juntos)); f.setGeometry(g); indice.addFeature(f)
+            juntos.append((g, props))
     return juntos, repetidos
 
 
@@ -298,7 +357,8 @@ def main():
         descargar()
     osm = leer_osm()
     ign = leer_ign()
-    juntos, repetidos = juntar(ign, osm)
+    ide = leer_ide()
+    juntos, (_, rep_ide, rep_osm) = juntar(ign, ide, osm)
     escribir(SALIDA_OSM, osm, "agua_osm_gran_resistencia")
     escribir(SALIDA, juntos, "agua_contexto_gran_resistencia")
 
@@ -310,8 +370,8 @@ def main():
         print(f"  {n:5d}  {tipo}  ({capa})")
     nombres = sorted({p["nombre"] for _, p in osm if p["nombre"]})
     print(f"\nCon nombre: {len(nombres)}. Algunos: " + ", ".join(nombres[:15]))
-    print(f"\nIGN: {len(ign)}  +  OSM: {len(osm)}  -  repetidos con el IGN: {repetidos}"
-          f"  =  {len(juntos)} entidades para capa_agua")
+    print(f"\nIGN: {len(ign)}  +  IDE: {len(ide)} (repetidas {rep_ide})  +  OSM: {len(osm)} "
+          f"(repetidas {rep_osm})  =  {len(juntos)} entidades para capa_agua")
     print("Salidas:\n  " + SALIDA_OSM + "\n  " + SALIDA)
     for carpeta in COPIAS:
         os.makedirs(carpeta, exist_ok=True)
