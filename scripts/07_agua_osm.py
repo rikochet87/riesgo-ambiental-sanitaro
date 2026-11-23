@@ -112,10 +112,11 @@ REGIMEN_IDE = {"Permanente": "perenne", "Temporales": "intermitente", "Temporal"
 
 
 def nombre_ide(nombre):
-    nombre = (nombre or "").strip()
+    # Según quién lea el archivo, el acento roto llega como "ï¿½" o como un solo "\ufffd"
+    nombre = (nombre or "").strip().replace("\ufffd", "ï¿½")
     if nombre in NOMBRES_IDE:
         return NOMBRES_IDE[nombre]
-    if "ï¿½" in nombre or "\ufffd" in nombre:
+    if "ï¿½" in nombre:
         print(f"  Aviso: nombre con acentos rotos sin corregir: {nombre!r} (agregalo a NOMBRES_IDE)")
     for corto, largo in (("Lag. ", "Laguna "), ("Ayo. ", "Arroyo ")):
         if nombre.startswith(corto):
