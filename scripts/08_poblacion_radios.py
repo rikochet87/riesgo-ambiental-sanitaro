@@ -92,6 +92,9 @@ def main():
     print(f"Población en el área: {sum(s['properties']['poblacion'] for s in salida):,}".replace(",", "."))
     print(f"Salida: {SALIDA}")
     for carpeta in COPIAS:
+        if os.name != "nt" and ":\\" in carpeta:
+            print(f"Copia salteada (ruta de Windows fuera de Windows): {carpeta}")
+            continue
         os.makedirs(carpeta, exist_ok=True)
         shutil.copy2(SALIDA, carpeta)
         print(f"Copia en: {carpeta}")

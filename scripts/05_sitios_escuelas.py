@@ -143,6 +143,9 @@ def main():
           f"mayor diámetro: {max(s['properties']['diametro_m'] for s in salida)} m")
     print(f"Salida: {SALIDA}")
     for carpeta in COPIAS:
+        if os.name != "nt" and ":\\" in carpeta:
+            print(f"Copia salteada (ruta de Windows fuera de Windows): {carpeta}")
+            continue
         os.makedirs(carpeta, exist_ok=True)
         shutil.copy2(SALIDA, carpeta)
         print(f"Copia en: {carpeta}")
