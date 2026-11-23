@@ -10,7 +10,10 @@ que se puede volver a correr cuando cambie un recorte. Por ahora:
 
   capa_salud     <- datos/salud/salud_gran_resistencia.geojson       (02)
   capa_escuelas  <- datos/educacion/escuelas_sitios_50m.geojson      (05)
-  capa_agua      <- datos/hidrografia/agua_gran_resistencia.geojson  (04)
+  capa_agua      <- datos/hidrografia/agua_contexto_gran_resistencia.geojson (07: IGN + OSM)
+
+El IGN solo (salida del 04) no se carga: a escala de ciudad le faltan el río
+Negro y las lagunas urbanas, y el índice tomaría "no hay agua cerca" como dato.
 
 Las capas que todavía no existen en datos/ se saltean con un aviso.
 
@@ -27,7 +30,7 @@ SALIDA = os.path.join(PROYECTO, "neon", "capas_contexto.sql")
 CAPAS = [
     ("capa_salud", os.path.join("datos", "salud", "salud_gran_resistencia.geojson"), []),
     ("capa_escuelas", os.path.join("datos", "educacion", "escuelas_sitios_50m.geojson"), []),
-    ("capa_agua", os.path.join("datos", "hidrografia", "agua_gran_resistencia.geojson"),
+    ("capa_agua", os.path.join("datos", "hidrografia", "agua_contexto_gran_resistencia.geojson"),
      ["tipo", "regimen", "capa"]),
 ]
 LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = -59.15, -27.62, -58.85, -27.30
