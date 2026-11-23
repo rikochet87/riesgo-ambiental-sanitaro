@@ -63,5 +63,5 @@ export function htmlIndice(riesgo) {
       ${barra('Exposición', e.puntaje, w.exposicion, detExpo)}
       ${barra('Vulnerabilidad ambiental', v.puntaje, w.vulnerabilidad, detVuln)}
       ${barra('Reportes vecinales', rv.puntaje, w.reportes, detRep)}
-      <p class="rz-nota">Índice preliminar: pesos y umbrales en calibración.</p>`;
+      <p class="rz-nota">Índice preliminar: pesos y umbrales en calibración. Capas: IGN, Mapa Educativo Nacional y &copy; colaboradores de OpenStreetMap.</p>`;
 }
