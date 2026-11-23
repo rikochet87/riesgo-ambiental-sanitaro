@@ -10,7 +10,8 @@ el mismo de los recortes anteriores, config.js y la base.
 Une todas las capas en una sola capa de agua para la tabla capa_agua, con:
   nombre   nombre del curso o cuerpo de agua (campo "fna" o "nam" del IGN)
   tipo     término genérico del IGN (campo "gna": laguna, río, canal...);
-           si la capa no lo trae, se usa el nombre de la capa
+           si viene vacío, la descripción del IGN (campo "objeto"), y si
+           tampoco está, el nombre de la capa
   regimen  perenne / intermitente (según el nombre de la capa)
   capa     capa de origen
 
@@ -81,6 +82,7 @@ COPIAS = LOCALES.get("COPIAS", [])
 LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = -59.15, -27.62, -58.85, -27.30
 CAMPOS_NOMBRE = ["fna", "nam", "nombre", "FNA", "NAM", "NOMBRE", "name"]
 CAMPOS_TIPO = ["gna", "GNA", "tipo", "TIPO"]
+CAMPOS_OBJETO = ["objeto", "OBJETO"]   # descripción del IGN, si falta el tipo
 
 if __name__ == "__main__" and len(sys.argv) >= 3 and os.path.isdir(sys.argv[1]):
     CARPETA_SHP, SALIDA = sys.argv[1], sys.argv[2]
@@ -208,6 +210,7 @@ def recortar_con_qgis():
         campos = [f.name() for f in capa.fields()]
         campo_nombre = next((c for c in CAMPOS_NOMBRE if c in campos), None)
         campo_tipo = next((c for c in CAMPOS_TIPO if c in campos), None)
+        campo_objeto = next((c for c in CAMPOS_OBJETO if c in campos), None)
         regimen = regimen_de(capa.name())
 
         for f in capa.getFeatures(QgsFeatureRequest().setFilterRect(area_capa)):
@@ -231,7 +234,8 @@ def recortar_con_qgis():
                 repetidas += 1
                 continue
             vistas.add(clave_geom)
-            tipo = texto(f[campo_tipo]) if campo_tipo else capa.name()
+            tipo = ((texto(f[campo_tipo]) if campo_tipo else "")
+                    or (texto(f[campo_objeto]) if campo_objeto else "") or capa.name())
             nueva = QgsFeature(salidas[tipo_geom][1].fields())
             nueva.setGeometry(g)
             nueva.setAttributes([texto(f[campo_nombre]) if campo_nombre else "", tipo, regimen, capa.name()])
@@ -317,6 +321,7 @@ def recortar_con_python():
         campos = [c[0] for c in src.fields[1:]]
         campo_nombre = next((c for c in CAMPOS_NOMBRE if c in campos), None)
         campo_tipo = next((c for c in CAMPOS_TIPO if c in campos), None)
+        campo_objeto = next((c for c in CAMPOS_OBJETO if c in campos), None)
         regimen = regimen_de(nombre_capa)
         for i in range(len(src)):
             shp = src.shape(i)
@@ -350,7 +355,8 @@ def recortar_con_python():
                 continue
             vistas.add(clave_geom)
             rec = src.record(i)
-            tipo = texto(rec[campo_tipo]) if campo_tipo else nombre_capa
+            tipo = ((texto(rec[campo_tipo]) if campo_tipo else "")
+                    or (texto(rec[campo_objeto]) if campo_objeto else "") or nombre_capa)
             props = {"nombre": texto(rec[campo_nombre]) if campo_nombre else "",
                      "tipo": tipo, "regimen": regimen, "capa": nombre_capa}
             nuevas[base_tipo].append((g, props))
