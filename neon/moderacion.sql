@@ -28,7 +28,7 @@ revoke all on public.reportes from moderador;
 grant usage on schema public to moderador;
 grant select on public.reportes to moderador;
 -- foto: solo para quitarla (el panel nunca escribe otra cosa que null)
-grant update (estado, foto_aprobada, foto, revisado_en, nota_admin) on public.reportes to moderador;
+grant update (estado, foto_aprobada, foto, revisado_en, nota_admin, tamano_moderado) on public.reportes to moderador;
 -- Eliminar un reporte entero. Su fila en amenaza_satelital se va con él (on delete cascade).
 grant delete on public.reportes to moderador;
 

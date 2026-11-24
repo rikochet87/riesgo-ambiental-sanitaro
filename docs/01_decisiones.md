@@ -61,6 +61,13 @@ El rol `moderador` se diseñó sin permiso para borrar, como red de seguridad an
 - El servidor exige sesión, mismo sitio y JSON, igual que cualquier cambio.
 - El moderador sigue sin poder mover la ubicación ni editar lo que escribió el vecino.
 
+## Tamaño corregido por el moderador (2026-11-24)
+El tamaño que indica el vecino (bolsas, carretilla, camioneta, camión o más) varía según quién lo estime. Se agregó `tamano_moderado`: el moderador lo corrige mirando la foto desde la ficha del panel. Se eligió esta opción entre otras (preguntar en pasos y altura, dibujos de referencia, dibujar el contorno en el mapa, confirmación de otros vecinos) porque no le pide nada más al vecino y una sola persona aplica un criterio parejo.
+- Lo del vecino queda en `tamano`, sin tocar; el moderador sigue sin poder editarlo.
+- El índice y el mapa público usan `coalesce(tamano_moderado, tamano)`. Si hay superficie satelital, esa manda.
+- El popup avisa "Tamaño revisado con la foto". La copia de seguridad trae las dos columnas.
+- Pendiente: alinear las categorías con la escala del satélite (hoy "camión o más" vale lo mismo que 5000 m²).
+
 ## Puntos a resolver
 - El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.

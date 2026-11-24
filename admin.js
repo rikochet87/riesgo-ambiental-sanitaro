@@ -255,7 +255,8 @@ function fila(r) {
   fecha.textContent = formatoCorto.format(new Date(r.creado_en));
   const detalle = document.createElement('span');
   detalle.className = 'fila-detalle';
-  detalle.textContent = [r.tipo && TIPOS[r.tipo], r.tamano && TAMANOS[r.tamano],
+  const tam = r.tamano_moderado || r.tamano;
+  detalle.textContent = [r.tipo && TIPOS[r.tipo], tam && TAMANOS[tam],
     r.tiene_foto && 'con foto', r.quema && 'lo queman'].filter(Boolean).join(', ') || 'Sin datos del lugar';
   boton.append(document.createElement('i'), titulo, fecha, detalle);
   boton.addEventListener('click', () => seleccionar(r.id));
@@ -411,7 +412,7 @@ function tarjeta(r) {
     `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}`;
 
   const datos = [
-    r.tipo && TIPOS[r.tipo], r.tamano && TAMANOS[r.tamano],
+    r.tipo && TIPOS[r.tipo], r.tamano && `${TAMANOS[r.tamano]} (según el vecino)`,
     r.antiguedad && `Desde hace: ${ANTIGUEDADES[r.antiguedad]}`,
   ].filter(Boolean).map((t) => [t, false]);
   if (r.quema) datos.push(['Lo queman', true]);
@@ -427,6 +428,7 @@ function tarjeta(r) {
 
   const desc = el.querySelector('.descripcion');
   if (r.descripcion) { desc.textContent = r.descripcion; desc.hidden = false; }
+  pintarTamano(el, r);
   el.querySelector('.nota textarea').value = r.nota_admin || '';
   el.querySelector('.nota').open = Boolean(r.nota_admin);
 
@@ -436,6 +438,14 @@ function tarjeta(r) {
     if (boton) accion(el, r, boton);
   });
   return el;
+}
+
+// Corrección del tamaño: la primera opción recuerda lo que dijo el vecino
+function pintarTamano(el, r) {
+  const sel = el.querySelector('.tamano-moderado select');
+  sel.options[0].textContent = r.tamano ? `Como dijo el vecino (${TAMANOS[r.tamano].toLowerCase()})`
+    : 'Como dijo el vecino (no lo indicó)';
+  sel.value = r.tamano_moderado || '';
 }
 
 function pintarEstado(el, r) {
@@ -536,21 +546,23 @@ async function accion(el, r, boton) {
   }
 
   const nota = el.querySelector('.nota textarea').value;
+  const tamanoModerado = el.querySelector('.tamano-moderado select').value || null;
   let cambio;
   let mensaje;
 
   switch (boton.dataset.accion) {
     case 'publicar':
-      cambio = { estado: 'verificado', nota_admin: nota };
+      cambio = { estado: 'verificado', nota_admin: nota, tamano_moderado: tamanoModerado };
       if (r.tiene_foto) cambio.foto_aprobada = el.querySelector('.acciones-pendiente .con-foto input').checked;
       mensaje = 'Publicado. Se verá en el mapa en un par de minutos.';
       break;
     case 'descartar':
-      cambio = { estado: 'descartado', nota_admin: nota };
+      cambio = { estado: 'descartado', nota_admin: nota, tamano_moderado: tamanoModerado };
       mensaje = 'Descartado. No se muestra en el mapa.';
       break;
     case 'guardar':
-      cambio = { estado: el.querySelector('.acciones-revisado select').value, nota_admin: nota };
+      cambio = { estado: el.querySelector('.acciones-revisado select').value, nota_admin: nota,
+                 tamano_moderado: tamanoModerado };
       if (r.tiene_foto) cambio.foto_aprobada = el.querySelector('.acciones-revisado .con-foto input').checked;
       mensaje = 'Cambios guardados.';
       break;
@@ -643,11 +655,12 @@ const fechaCsv = (iso) => iso ? new Intl.DateTimeFormat('sv-SE', {
 }).format(new Date(iso)) : '';
 
 function csv(reportes) {
-  const columnas = ['id', 'fecha_reporte', 'latitud', 'longitud', 'estado', 'tipo', 'tamano', 'lo_queman',
+  const columnas = ['id', 'fecha_reporte', 'latitud', 'longitud', 'estado', 'tipo', 'tamano', 'tamano_corregido', 'lo_queman',
     'cerca_de_agua', 'cerca_de_escuela_o_salud', 'antiguedad', 'descripcion', 'tiene_foto', 'foto_publicada',
     'foto_archivo', 'revisado', 'nota_interna'];
   const filas = reportes.map((r) => [
     r.id, fechaCsv(r.creado_en), r.lat, r.lon, ESTADOS[r.estado], TIPOS[r.tipo] ?? r.tipo, TAMANOS[r.tamano] ?? r.tamano,
+    TAMANOS[r.tamano_moderado] ?? r.tamano_moderado,
     r.quema, r.cerca_agua, r.cerca_escuela, ANTIGUEDADES[r.antiguedad] ?? r.antiguedad,
     [r.descripcion, { texto: true }], r.tiene_foto, r.foto_aprobada, r.tiene_foto ? `fotos/${r.id}.jpg` : null,
     fechaCsv(r.revisado_en), [r.nota_admin, { texto: true }],
@@ -694,6 +707,8 @@ function leeme(reportes, fotos, faltantes, ahora) {
     '                   resuelto (verde) o descartado.',
     '  tipo, tamano, antiguedad, quema, cerca_agua, cerca_escuela',
     '                   Relevamiento opcional del vecino.',
+    '  tamano_moderado  Tamaño corregido por el moderador mirando la foto (vacío',
+    '                   si no se corrigió). El índice y el mapa usan este si está.',
     '  descripcion      Texto libre del vecino.',
     '  tiene_foto       Si el reporte tiene foto guardada.',
     '  foto_aprobada    Si la foto se muestra en el mapa público.',

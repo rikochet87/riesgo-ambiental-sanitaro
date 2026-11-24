@@ -167,6 +167,55 @@ test('quitar la foto la borra de la base y del mapa; la nota queda guardada', as
   assert.equal(enMapa.tiene_foto, false);
 });
 
+test('tamaño según la foto: corrige el índice y el mapa sin tocar lo que dijo el vecino', async () => {
+  const cookie = await sesion();
+  const patch = async (cuerpo) => leer(await moderar.PATCH(pedir('/api/admin/reportes',
+    { metodo: 'PATCH', cuerpo: { id: ID_FOTO, ...cuerpo }, cookie, origen: SITIO })));
+  const enMapa = async () => (await (await reportesPublicos.GET(pedir('/api/reportes'))).json())
+    .find((x) => x.id === ID_FOTO);
+  const amenaza = async () => (await (await riesgoAdmin.GET(pedir(`/api/admin/riesgo?id=${ID_FOTO}`, { cookie }))).json()).amenaza;
+
+  await admin(`update public.reportes set tamano = 'carretilla', tamano_moderado = null where id = $1`, [ID_FOTO]);
+  assert.equal((await enMapa()).tamano, 'carretilla');
+  assert.equal((await amenaza()).tamano, 0.3);
+
+  const r = await patch({ tamano_moderado: 'camion_o_mas' });
+  assert.equal(r.estado, 200);
+  assert.equal(r.cuerpo.tamano_moderado, 'camion_o_mas');
+  const [fila] = await admin('select tamano, tamano_moderado from public.reportes where id = $1', [ID_FOTO]);
+  assert.deepEqual(fila, { tamano: 'carretilla', tamano_moderado: 'camion_o_mas' }, 'lo del vecino queda guardado');
+  assert.equal((await enMapa()).tamano, 'camion_o_mas', 'el mapa muestra la corrección');
+  const a = await amenaza();
+  assert.equal(a.tamano, 1);
+  assert.equal(a.tamano_corregido, true);
+
+  const lista = await leer(await moderar.GET(pedir('/api/admin/reportes?estado=todos', { cookie })));
+  assert.equal(lista.cuerpo.reportes.find((x) => x.id === ID_FOTO).tamano_moderado, 'camion_o_mas');
+
+  assert.equal((await patch({ tamano_moderado: 'enorme' })).estado, 400);
+  assert.equal((await patch({ tamano: 'bolsas' })).estado, 400, 'el tamaño del vecino no se edita desde el panel');
+
+  assert.equal((await patch({ tamano_moderado: null })).cuerpo.tamano_moderado, null);
+  assert.equal((await enMapa()).tamano, 'carretilla', 'sin corrección vuelve lo del vecino');
+  const b = await amenaza();
+  assert.equal(b.tamano, 0.3);
+  assert.equal(b.tamano_corregido, false);
+});
+
+test('el público no puede mandar un tamaño corregido', async () => {
+  const id = '66666666-6666-4666-8666-666666666666';
+  const r = await reportesPublicos.POST(new Request(SITIO + '/api/reportes', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, lat: -27.45, lon: -58.97, tamano: 'bolsas', tamano_moderado: 'camion_o_mas' }),
+  }));
+  assert.equal(r.status, 201);
+  const [fila] = await admin('select tamano, tamano_moderado from public.reportes where id = $1', [id]);
+  assert.deepEqual(fila, { tamano: 'bolsas', tamano_moderado: null });
+  await assert.rejects(ejecutorLocal('anonymous', [[`update public.reportes set tamano_moderado = 'bolsas'`, []]]),
+                       (e) => e.code === '42501');
+  await admin('delete from public.reportes where id = $1', [id]);
+});
+
 test('pedidos inválidos: estado inventado, id inexistente, solo campos no permitidos, nota larga', async () => {
   const cookie = await sesion();
   const casos = [
@@ -187,7 +236,8 @@ test('pedidos inválidos: estado inventado, id inexistente, solo campos no permi
 
 test('el rol moderador, aunque el código fallara, no puede mover un reporte ni editar lo del vecino', async () => {
   for (const sql of ['update public.reportes set lat = -27.0',
-                     'update public.reportes set descripcion = $$x$$', 'select * from public.admin_intentos']) {
+                     'update public.reportes set descripcion = $$x$$', 'update public.reportes set tamano = $$bolsas$$',
+                     'select * from public.admin_intentos']) {
     await assert.rejects(ejecutorLocal('moderador', [[sql, []]]), (e) => e.code === '42501', sql);
   }
 });

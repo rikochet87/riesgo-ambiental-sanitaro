@@ -20,6 +20,7 @@ Si falta una capa, ese factor queda "sin datos" y su peso se reparte entre los d
 | Reportes vecinales | 25% | 50% reportes verificados a < 300 m (máx. 5) + 50% días del más antiguo (máx. 180) |
 
 ## Datos
+- Tamaño del vecino: si el moderador lo corrigió mirando la foto (`tamano_moderado`, desde 2026-11-24), se usa la corrección.
 - Satélite: tabla `amenaza_satelital` (area_m2, quemas_12m, crecimiento_pct), la carga `scripts/09_quemas_ee.js` (Earth Engine). Desde 2026-11-24 cada dato satelital completa su parte por separado: superficie y crecimiento, si están, reemplazan lo del vecino; las quemas se combinan y queda la señal más alta (el satélite no borra una quema informada). Fuente: "relevamiento", "mixta" o "satelite". Por ahora el script solo mide quemas.
 - Contexto (EPSG:4326): `capa_poblacion`, `capa_escuelas`, `capa_salud`, `capa_agua`, `capa_inundable`. Se cargan con `neon/capas_contexto.sql` (generado por `scripts/06_sql_capas.py`).
 - Cargadas (2026-11-23): `capa_salud` (42 establecimientos del IGN) y `capa_escuelas` (357 sitios: las 494 escuelas del Mapa Educativo agrupadas a 50 m, para no contar dos veces un edificio con varios turnos o niveles).

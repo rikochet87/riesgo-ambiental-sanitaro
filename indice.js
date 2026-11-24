@@ -33,6 +33,7 @@ export function htmlIndice(riesgo) {
   const detAmenaza = a.fuente === 'satelite' ? satelite + ' (satélite)'
     : a.fuente === 'mixta' ? `Relevamiento vecinal y satélite: ${satelite}`
     : 'Estimada con el relevamiento vecinal (aún sin análisis satelital)';
+  const notaTamano = a.tamano_corregido ? ' Tamaño revisado con la foto.' : '';
 
   const detExpo = e.puntaje == null
     ? 'Faltan capas de población y equipamientos'
@@ -60,7 +61,7 @@ export function htmlIndice(riesgo) {
         <span class="rz-num" style="color:${colorClase}">${riesgo.total ?? '–'}</span>
         <span>Índice ambiental y sanitario<br><b style="color:${colorClase}">Riesgo ${clase}</b> <small>sobre 100</small></span>
       </div>
-      ${barra('Amenaza', a.puntaje, w.amenaza, detAmenaza)}
+      ${barra('Amenaza', a.puntaje, w.amenaza, detAmenaza + notaTamano)}
       ${barra('Exposición', e.puntaje, w.exposicion, detExpo)}
       ${barra('Vulnerabilidad ambiental', v.puntaje, w.vulnerabilidad, detVuln)}
       ${barra('Reportes vecinales', rv.puntaje, w.reportes, detRep)}

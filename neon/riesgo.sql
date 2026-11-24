@@ -172,8 +172,8 @@ begin
   buf := gis.st_buffer(pt, p.radio_exposicion_m)::gis.geometry;
 
   -- ---------------- 1. Amenaza ----------------
-  -- Lo que releva el vecino
-  v_tam := case r.tamano when 'bolsas' then 0.1 when 'carretilla' then 0.3
+  -- Lo que releva el vecino (el tamaño, corregido por el moderador si lo hizo)
+  v_tam := case coalesce(r.tamano_moderado, r.tamano) when 'bolsas' then 0.1 when 'carretilla' then 0.3
                          when 'camioneta' then 0.6 when 'camion_o_mas' then 1.0 end;
   v_que := case when r.quema then 1 else 0 end;
   -- la antigüedad informada se usa como indicio de persistencia
@@ -275,6 +275,7 @@ begin
     'amenaza', jsonb_build_object(
       'puntaje', round(amenaza, 2), 'fuente', fuente,
       'tamano', round(a_tam, 2), 'quemas', round(a_que, 2), 'crecimiento', round(a_cre, 2),
+      'tamano_corregido', r.tamano_moderado is not null and s.area_m2 is null,
       'area_m2', s.area_m2, 'quemas_12m', s.quemas_12m, 'crecimiento_pct', s.crecimiento_pct),
     'exposicion', jsonb_build_object(
       'puntaje', round(exposicion, 2), 'radio_m', p.radio_exposicion_m,

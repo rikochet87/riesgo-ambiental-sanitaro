@@ -7,6 +7,7 @@ import { json, malPedido, errorDeBase, UUID } from '../_http.js';
 import { controlar, leerJSON } from '../_admin.js';
 
 const ESTADOS = ['pendiente', 'verificado', 'en_gestion', 'resuelto', 'descartado'];
+const TAMANOS = ['bolsas', 'carretilla', 'camioneta', 'camion_o_mas'];
 const POR_PAGINA = 1000;
 
 export async function GET(request) {
@@ -21,8 +22,8 @@ export async function GET(request) {
 
   try {
     const [filas, conteo, [copia]] = await comoModerador([
-      [`select id, creado_en, lat, lon, tipo, tamano, quema, cerca_agua, cerca_escuela, antiguedad,
-               descripcion, estado, foto_aprobada, (foto is not null) as tiene_foto,
+      [`select id, creado_en, lat, lon, tipo, tamano, tamano_moderado, quema, cerca_agua, cerca_escuela,
+               antiguedad, descripcion, estado, foto_aprobada, (foto is not null) as tiene_foto,
                revisado_en, nota_admin
         from public.reportes
         where $1 = 'todos' or estado = $1
@@ -69,6 +70,11 @@ export async function PATCH(request) {
     if (nota && nota.length > 500) return malPedido('La nota puede tener hasta 500 caracteres.');
     agregar('nota_admin', nota);
   }
+  if (datos.tamano_moderado !== undefined) {
+    // null = usar lo que dijo el vecino
+    if (datos.tamano_moderado !== null && !TAMANOS.includes(datos.tamano_moderado)) return malPedido('Tamaño desconocido.');
+    agregar('tamano_moderado', datos.tamano_moderado);
+  }
   if (!cambios.length) return malPedido('No hay nada para cambiar.');
   cambios.push('revisado_en = now()');
 
@@ -76,7 +82,8 @@ export async function PATCH(request) {
     const [filas] = await comoModerador([[
       `update public.reportes set ${cambios.join(', ')}
        where id = $1
-       returning id, estado, foto_aprobada, (foto is not null) as tiene_foto, revisado_en, nota_admin`,
+       returning id, estado, foto_aprobada, (foto is not null) as tiene_foto, revisado_en, nota_admin,
+                 tamano_moderado`,
       valores,
     ]]);
     if (!filas.length) return json({ code: 'NO_EXISTE', message: 'Ese reporte no existe.' }, 404);

@@ -57,7 +57,7 @@ Todo el cálculo vive en la base de datos (función `riesgo_calculo` en `neon/ri
 
 | Valor | Con lo que releva el vecino | Con el satélite (si hay dato) |
 | --- | --- | --- |
-| Tamaño | bolsas 0,1 · carretilla 0,3 · camioneta 0,6 · camión o más 1 | superficie / 5000 m² (tope 1) |
+| Tamaño | bolsas 0,1 · carretilla 0,3 · camioneta 0,6 · camión o más 1 (corregido por el moderador mirando la foto, si lo hizo) | superficie / 5000 m² (tope 1) |
 | Quemas | se quema: 1 · no: 0 | quemas en 12 meses / 4 (tope 1) |
 | Persistencia | días 0,2 · semanas 0,4 · meses 0,7 · más de un año 1 | crecimiento de la superficie en el año / 100 % (entre 0 y 1) |
 
@@ -191,6 +191,7 @@ Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la 
 - **La ficha** muestra la foto aunque no esté aprobada, los datos del relevamiento, la descripción, un enlace a Google Maps y los botones de moderar. El punto queda marcado con un anillo. `Esc` vuelve a la lista.
 - **Publicar** pasa un pendiente a activo, con o sin su foto; el punto cambia de color en el acto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado y se publica o despublica la foto.
 - **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
+- **Tamaño según la foto:** el moderador puede corregir el tamaño que indicó el vecino. La corrección se guarda aparte (lo del vecino no se toca) y la usan el índice y el mapa; el popup avisa "Tamaño revisado con la foto". Elegir "Como dijo el vecino" la quita.
 - Nota interna por reporte, que nunca se publica.
 - **Eliminar reporte** lo borra entero de la base (foto, ubicación y datos). Pide confirmación con "Cancelar" seleccionado de entrada, sugiere Descartar si solo se quiere sacarlo del mapa, y avisa si no hay una copia de seguridad reciente. No tiene vuelta atrás salvo esa copia, o dentro de las 6 horas que guarda Neon.
 - En la compu, el panel va a la izquierda y el mapa a la derecha. En el celular, el mapa ocupa la pantalla y el panel es una hoja que sube desde abajo: baja (resumen y capas), media (ficha con el punto a la vista) o alta (lista).
@@ -213,7 +214,7 @@ El ZIP se arma en el navegador porque Vercel no deja que una función devuelva m
 **Seguridad del panel:**
 - La sesión es una cookie firmada, válida 8 horas, que solo viaja a `/api/admin`, no la puede leer JavaScript y no se manda desde otros sitios. Cambiar `ADMIN_CLAVE` cierra todas las sesiones.
 - Con 10 claves incorrectas en 15 minutos se bloquea la entrada (incluso con la correcta) hasta que pasen.
-- Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes, cambiar estado, foto y nota, y eliminar un reporte entero, pero **no puede mover su ubicación ni editar lo que escribió el vecino**, aunque el código tuviera un error.
+- Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes, cambiar estado, foto y nota, corregir el tamaño (en una columna aparte) y eliminar un reporte entero, pero **no puede mover su ubicación ni editar lo que escribió el vecino**, aunque el código tuviera un error.
 - Lo que escribe el vecino se muestra siempre como texto, nunca como HTML.
 
 También se puede moderar desde el *SQL Editor* de Neon; hay consultas listas al final de `neon/schema.sql`.

@@ -23,7 +23,7 @@ export async function GET(request) {
   try {
     const [filas] = await comoModerador([[
       // Coordenadas completas (el mapa público las redondea; la copia no)
-      `select id, creado_en, lat, lon, estado, tipo, tamano, quema, cerca_agua, cerca_escuela,
+      `select id, creado_en, lat, lon, estado, tipo, tamano, tamano_moderado, quema, cerca_agua, cerca_escuela,
               antiguedad, descripcion, (foto is not null) as tiene_foto, foto_aprobada,
               octet_length(foto) as foto_bytes, revisado_en, nota_admin
        from public.reportes

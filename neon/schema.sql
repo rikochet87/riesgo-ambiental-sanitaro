@@ -66,6 +66,9 @@ create table if not exists public.reportes (
   foto_aprobada   boolean not null default false,
   revisado_en     timestamptz,
   nota_admin      text,
+  -- Tamaño corregido por el moderador mirando la foto (2026-11-24). El del
+  -- vecino queda en "tamano", sin tocar; el índice y el mapa usan este si está.
+  tamano_moderado text,
 
   -- Reglas de validación
   constraint dentro_gran_resistencia check (
@@ -90,8 +93,20 @@ create table if not exists public.reportes (
   ),
   constraint estado_valido check (
     estado in ('pendiente', 'verificado', 'en_gestion', 'resuelto', 'descartado')
+  ),
+  constraint tamano_moderado_valido check (
+    tamano_moderado is null or tamano_moderado in ('bolsas', 'carretilla', 'camioneta', 'camion_o_mas')
   )
 );
+
+-- Bases creadas antes del 2026-11-24: agregar la corrección de tamaño
+alter table public.reportes add column if not exists tamano_moderado text;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'tamano_moderado_valido') then
+    alter table public.reportes add constraint tamano_moderado_valido check (
+      tamano_moderado is null or tamano_moderado in ('bolsas', 'carretilla', 'camioneta', 'camion_o_mas'));
+  end if;
+end $$;
 
 comment on table public.reportes is
   'Reportes vecinales de basurales. Semáforo: verificado=rojo, en_gestion=amarillo, resuelto=verde.';
@@ -206,7 +221,7 @@ select
   round(lon::numeric, 4)::double precision as lon,
   estado,
   tipo,
-  tamano,
+  coalesce(tamano_moderado, tamano) as tamano,   -- la corrección del moderador, si hay
   quema,
   creado_en::date as fecha,
   (foto is not null and foto_aprobada) as tiene_foto
