@@ -147,8 +147,11 @@ test('una vez verificado: aparece en el mapa con fecha AAAA-MM-DD, y entrega fot
   assert.match(r.fecha, /^\d{4}-\d{2}-\d{2}$/, 'el navegador arma la fecha con fecha + "T12:00:00"');
   assert.equal(typeof r.lat, 'number');
   assert.deepEqual(Object.keys(r).sort(),
-    ['estado', 'fecha', 'id', 'lat', 'lon', 'quema', 'tamano', 'tiene_foto', 'tipo'],
+    ['estado', 'fecha', 'id', 'lat', 'lon', 'quema', 'riesgo_clase', 'riesgo_total', 'tamano', 'tiene_foto', 'tipo'],
     'nada de descripción, foto ni datos de moderación');
+  // Se publicó por SQL, sin pasar por el panel: la visita misma calcula el índice que faltaba
+  assert.match(r.riesgo_clase, /^(bajo|medio|alto)$/);
+  assert.equal(typeof r.riesgo_total, 'number');
 
   const f = await leer(await foto.GET(pedir(`/api/foto?id=${ID_1}`)));
   assert.equal(f.cuerpo, FOTO);

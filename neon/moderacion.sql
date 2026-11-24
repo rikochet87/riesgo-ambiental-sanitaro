@@ -31,6 +31,11 @@ grant select on public.reportes to moderador;
 grant update (estado, foto_aprobada, foto, revisado_en, nota_admin, tamano_moderado) on public.reportes to moderador;
 -- Eliminar un reporte entero. Su fila en amenaza_satelital se va con él (on delete cascade).
 grant delete on public.reportes to moderador;
+-- Recalcular el índice guardado del reporte moderado y sus vecinos (mapa por riesgo)
+grant execute on function public.riesgo_recalcular_zona(uuid, double precision, double precision) to moderador;
+grant select (reporte_id, total, clase) on public.riesgo_cache to moderador;
+drop policy if exists "moderador_lee_riesgo" on public.riesgo_cache;
+create policy "moderador_lee_riesgo" on public.riesgo_cache for select to moderador using (true);
 
 -- La tabla tiene RLS: sin estas políticas el moderador no vería ni una fila
 drop policy if exists "moderador_lee" on public.reportes;

@@ -109,7 +109,7 @@ do $$ begin
 end $$;
 
 comment on table public.reportes is
-  'Reportes vecinales de basurales. Semáforo: verificado=rojo, en_gestion=amarillo, resuelto=verde.';
+  'Reportes vecinales de basurales. Estados: pendiente, verificado (activo), resuelto (ya no está), descartado. en_gestion quedó en desuso (2026-11-24) y cuenta como activo.';
 
 create index if not exists reportes_geom_idx      on public.reportes using gist (geom);
 create index if not exists reportes_creado_en_idx on public.reportes (creado_en);
@@ -226,7 +226,7 @@ select
   creado_en::date as fecha,
   (foto is not null and foto_aprobada) as tiene_foto
 from public.reportes
-where estado in ('verificado', 'en_gestion', 'resuelto');
+where estado in ('verificado', 'en_gestion');   -- activos; "ya no está" (resuelto) no se publica
 
 revoke all on public.reportes_publicos from anonymous, authenticated;
 grant select on public.reportes_publicos to anonymous;
@@ -249,7 +249,7 @@ as $$
   where id = p_id
     and foto_aprobada
     and foto is not null
-    and estado in ('verificado', 'en_gestion', 'resuelto');
+    and estado in ('verificado', 'en_gestion');
 $$;
 
 revoke all on function public.foto_basural(uuid) from public;
@@ -272,4 +272,4 @@ grant execute on function public.foto_basural(uuid) to anonymous;
 --   set estado = 'verificado', foto_aprobada = true, revisado_en = now()
 --   where id = '...';
 --
--- Otros estados: 'en_gestion' (amarillo), 'resuelto' (verde), 'descartado'.
+-- Otros estados: 'resuelto' (en el panel, "Ya no está": deja de verse en el mapa), 'descartado'.

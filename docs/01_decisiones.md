@@ -68,6 +68,13 @@ El tamaño que indica el vecino (bolsas, carretilla, camioneta, camión o más) 
 - El popup avisa "Tamaño revisado con la foto". La copia de seguridad trae las dos columnas.
 - Pendiente: alinear las categorías con la escala del satélite (hoy "camión o más" vale lo mismo que 5000 m²).
 
+## Mapa por riesgo y tamaño; estados simplificados (2026-11-24)
+Los colores por estado (activo, en gestión, resuelto) suponían un seguimiento de la gestión que el sistema no hace. Ahora:
+- **Color** del punto: clase del índice (alto, medio, bajo), con los tonos del tema. **Tamaño** del punto: tamaño del basural (el corregido por el moderador, si lo hay); borde punteado si no se informó.
+- **Estados:** pendiente, activo (`verificado`), ya no está (`resuelto`, no se publica) y descartado. `en_gestion` queda en desuso y cuenta como activo.
+- El índice de cada activo se guarda en `riesgo_cache` (calcularlo tarda ~25 ms): se recalcula al moderar (el reporte y sus activos a 300 m), al cargar capas o satélite (todos) y en las visitas (hasta 20 de más de un día).
+- Alternativas consideradas: color por tamaño solo (deja afuera exposición y agua) y color por riesgo solo.
+
 ## Puntos a resolver
 - El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.

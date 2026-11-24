@@ -22,7 +22,7 @@ Saber **dónde** están los basurales y **cuáles** son más riesgosos ayuda a p
 
 1. **El vecino reporta.** Marca el punto en el mapa, saca una foto (opcional) y, si quiere, completa un relevamiento corto: tipo de residuos, tamaño, si se quema, desde cuándo está. Funciona sin señal: el reporte queda guardado y se envía solo al recuperarla.
 2. **Un moderador revisa.** Desde el panel `/admin` publica o descarta cada reporte, decide si la foto se muestra y puede quitarla (caras, patentes) o eliminar el reporte entero.
-3. **El mapa público** muestra solo los basurales revisados, con colores por estado (activo, en gestión, resuelto). Al tocar uno se ve la foto aprobada y el índice de riesgo con sus componentes.
+3. **El mapa público** muestra los basurales activos ya revisados. El **color** es su riesgo (rojo alto, amarillo medio, verde bajo) y el **tamaño del punto**, el tamaño del basural; con borde punteado, si no se informó. Al tocar uno se ve la foto aprobada y el índice de riesgo con sus componentes. Cuando un basural desaparece, el moderador lo marca "ya no está" y deja de verse.
 
 **Privacidad.** Nunca se muestra quién reportó. Las fotos pierden en el celular la ubicación que traen y no se publican hasta que alguien las revisa. El público solo puede *cargar* reportes: no puede leer los ajenos, ni editarlos, ni borrarlos. El mapa público redondea las coordenadas a unos 11 m.
 
@@ -75,6 +75,8 @@ Cada dato satelital completa su parte por separado: la superficie y el crecimien
 **4. Reportes vecinales** = 50 % basurales activos (verificados) a menos de 300 m, contando este, / 5 (tope 1) + 50 % días desde el reporte activo más viejo de la zona / 180 (tope 1).
 
 **Total** = 100 × promedio ponderado de los cuatro componentes, con pesos iniciales de 25 % cada uno. **Clases:** bajo por debajo de 34, medio de 34 a 66, alto desde 67.
+
+**Índice guardado.** Para pintar el mapa por riesgo, la base guarda el último índice de cada basural activo (`riesgo_cache`). Calcularlo tarda unos 25 ms por basural, así que no se hace en cada visita: se recalcula al moderar (ese basural y los activos a menos de 300 m, porque el componente de reportes depende de los vecinos), al cargar capas o datos satelitales (todos, con `riesgo_recalcular_todo()`), y en cada visita al mapa se refrescan hasta 20 índices de más de un día, para que la persistencia avance. El popup siempre calcula el índice en el momento.
 
 **Datos faltantes.** Si una capa no está cargada, ese factor figura como "sin datos" y su peso se reparte entre los que sí tienen dato. No se inventan valores. Eso tiene una consecuencia: al cargar una capa nueva, un factor que antes no contaba entra con su valor real, y si es bajo, el índice de un basural puede bajar.
 
@@ -185,11 +187,12 @@ Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` car
 
 Desde **`/admin`** (https://riesgo-ambiental-sanitaro.vercel.app/admin), con la clave `ADMIN_CLAVE`. Es un visor GIS:
 
-- **Mapa con todos los reportes** en sus coordenadas exactas (el mapa público las redondea), coloreados por estado. Los pendientes, en azul índigo, se dibujan más grandes y por encima. Mapa base de calles o satélite.
-- **Capas por estado** que se prenden y apagan: pendientes, activos (rojo), en gestión (amarillo), resueltos (verde) y descartados (gris, apagados al abrir). La lista sigue a las capas prendidas.
+- **Mapa con todos los reportes** en sus coordenadas exactas (el mapa público las redondea). Los pendientes, en azul índigo, se dibujan más grandes y por encima; los activos, como en el mapa público, con el color de su riesgo y el tamaño del basural. Mapa base de calles o satélite.
+- **Capas por estado** que se prenden y apagan: pendientes, activos, "ya no están" y descartados (estos dos, apagados al abrir). La lista sigue a las capas prendidas.
 - **Tocar un punto** (o una fila de la lista) abre el **popup con el índice de riesgo**, el mismo que ve el público, pero también para pendientes y descartados, que sirve para priorizar qué revisar primero. En la compu se abre además la ficha en el panel; en el celular el popup trae un botón "Moderar este reporte" que lleva a la ficha.
 - **La ficha** muestra la foto aunque no esté aprobada, los datos del relevamiento, la descripción, un enlace a Google Maps y los botones de moderar. El punto queda marcado con un anillo. `Esc` vuelve a la lista.
-- **Publicar** pasa un pendiente a activo, con o sin su foto; el punto cambia de color en el acto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado y se publica o despublica la foto.
+- **Publicar** pasa un pendiente a activo, con o sin su foto. **Descartar** lo saca del circuito sin borrarlo. En los ya revisados se cambia el estado (activo o **ya no está**, que deja de verse en el mapa pero queda guardado) y se publica o despublica la foto.
+- **Estados (desde 2026-11-24):** pendiente, activo, ya no está y descartado. "En gestión" y "resuelto" como seguimiento se dejaron de usar: el sistema no hace la gestión de los basurales. En la base, "ya no está" es el valor `resuelto`, y un `en_gestion` viejo cuenta como activo.
 - **Quitar la foto** la borra de la base (para una cara, una patente o algo ofensivo). Pide un segundo toque porque no tiene vuelta atrás.
 - **Tamaño según la foto:** el moderador puede corregir el tamaño que indicó el vecino. La corrección se guarda aparte (lo del vecino no se toca) y la usan el índice y el mapa; el popup avisa "Tamaño revisado con la foto". Elegir "Como dijo el vecino" la quita.
 - Nota interna por reporte, que nunca se publica.

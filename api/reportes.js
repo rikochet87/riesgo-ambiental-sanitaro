@@ -13,14 +13,16 @@ const PESO_MAX = 700_000;
 
 export async function GET() {
   try {
-    const [filas] = await comoPublico([[
+    const [, filas] = await comoPublico([
+      // Refresca hasta 20 índices guardados de más de un día (la persistencia avanza)
+      ['select public.riesgo_refrescar(20)', []],
       // fecha como texto (AAAA-MM-DD): el driver la convertiría a Date
-      `select id, lat, lon, estado, tipo, tamano, quema, fecha::text as fecha, tiene_foto
-       from public.reportes_publicos
-       order by fecha desc
-       limit 3000`,
-      [],
-    ]]);
+      [`select id, lat, lon, estado, tipo, tamano, quema, fecha::text as fecha, tiene_foto,
+               riesgo_clase, riesgo_total
+        from public.reportes_publicos
+        order by fecha desc
+        limit 3000`, []],
+    ]);
     // Un minuto en la CDN de Vercel: el mapa no despierta la base en cada visita
     return json(filas, 200, { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' });
   } catch (err) {

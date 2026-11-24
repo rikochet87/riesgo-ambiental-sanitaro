@@ -47,4 +47,7 @@ insert into public.capa_salud (nombre, geom) values
   ('Hospital Luis Fleitas', gis.st_setsrid(gis.st_makepoint(-59.0312296, -27.4156743), 4326)),
   ('Hospital Doctor Céspedes Oxley', gis.st_setsrid(gis.st_makepoint(-59.0898670, -27.3718746), 4326));
 
+-- Índice guardado de los activos, con la capa nueva
+select public.riesgo_recalcular_todo();
+
 commit;

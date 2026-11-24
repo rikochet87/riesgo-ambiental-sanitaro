@@ -164,7 +164,7 @@ begin
   -- para el panel de moderación, cualquier reporte
   select * into r from public.reportes
   where id = p_id
-    and (not p_solo_publicados or estado in ('verificado', 'en_gestion', 'resuelto'));
+    and (not p_solo_publicados or estado in ('verificado', 'en_gestion'));
   if not found then return null; end if;
 
   select * into p from public.parametros_riesgo limit 1;
@@ -310,9 +310,153 @@ $$;
 revoke all on function public.riesgo_basural(uuid) from public;
 grant execute on function public.riesgo_basural(uuid) to anonymous;
 
+-- ---------------------------------------------------------------------
+-- 6. Índice guardado, para pintar el mapa por riesgo (2026-11-24)
+-- ---------------------------------------------------------------------
+-- Calcular el índice tarda ~25 ms por reporte: para pintar todos los puntos
+-- no se puede calcular en cada visita. Se guarda el último de cada reporte
+-- activo y se recalcula:
+--   - al moderar: el reporte y los activos a menos de radio_reportes_m
+--     (el componente "reportes vecinales" depende de los vecinos);
+--   - al cargar capas o datos satelitales: todos (riesgo_recalcular_todo);
+--   - en cada visita al mapa: los 20 más viejos de un día, para que la
+--     persistencia ("días del más antiguo") avance.
+create table if not exists public.riesgo_cache (
+  reporte_id    uuid primary key references public.reportes (id) on delete cascade,
+  total         integer,
+  clase         text,
+  calculado_en  timestamptz not null default now()
+);
+alter table public.riesgo_cache enable row level security;
+revoke all on public.riesgo_cache from public;
+
+-- Guarda (o borra, si ya no está activo) el índice de un reporte
+create or replace function public.riesgo_guardar(p_id uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare x jsonb;
+begin
+  if exists (select 1 from public.reportes where id = p_id and estado in ('verificado', 'en_gestion')) then
+    x := public.riesgo_calculo(p_id, false);
+    insert into public.riesgo_cache (reporte_id, total, clase, calculado_en)
+    values (p_id, (x ->> 'total')::integer, x ->> 'clase', now())
+    on conflict (reporte_id) do update
+      set total = excluded.total, clase = excluded.clase, calculado_en = excluded.calculado_en;
+  else
+    delete from public.riesgo_cache where reporte_id = p_id;
+  end if;
+end;
+$$;
+revoke all on function public.riesgo_guardar(uuid) from public;
+
+-- Después de moderar o eliminar un reporte: ese y los activos cercanos.
+-- Recibe la ubicación aparte porque, al eliminar, el reporte ya no está.
+create or replace function public.riesgo_recalcular_zona(p_id uuid, p_lat double precision, p_lon double precision)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  n integer := 0;
+  radio integer := (select radio_reportes_m from public.parametros_riesgo limit 1);
+  pt gis.geography := gis.st_setsrid(gis.st_makepoint(p_lon, p_lat), 4326)::gis.geography;
+  v uuid;
+begin
+  perform public.riesgo_guardar(p_id);
+  for v in select x.id from public.reportes x
+           where x.id <> p_id and x.estado in ('verificado', 'en_gestion')
+             and gis.st_dwithin(x.geom::gis.geography, pt, radio)
+  loop
+    perform public.riesgo_guardar(v);
+    n := n + 1;
+  end loop;
+  return n + 1;
+end;
+$$;
+revoke all on function public.riesgo_recalcular_zona(uuid, double precision, double precision) from public;
+
+-- Todos los activos (al cargar capas o datos satelitales; lo corre el dueño de la base)
+create or replace function public.riesgo_recalcular_todo()
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare n integer := 0; v uuid;
+begin
+  delete from public.riesgo_cache c
+  where not exists (select 1 from public.reportes x
+                    where x.id = c.reporte_id and x.estado in ('verificado', 'en_gestion'));
+  for v in select id from public.reportes where estado in ('verificado', 'en_gestion') loop
+    perform public.riesgo_guardar(v);
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+revoke all on function public.riesgo_recalcular_todo() from public;
+
+-- En cada visita al mapa: hasta p_max índices faltantes o de más de un día.
+-- Si otra visita ya está refrescando, no espera.
+create or replace function public.riesgo_refrescar(p_max integer default 20)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare n integer := 0; v uuid;
+begin
+  if not pg_try_advisory_xact_lock(hashtext('riesgo_refrescar')) then return 0; end if;
+  for v in select x.id from public.reportes x
+           left join public.riesgo_cache c on c.reporte_id = x.id
+           where x.estado in ('verificado', 'en_gestion')
+             and (c.reporte_id is null or c.calculado_en < now() - interval '1 day')
+           order by c.calculado_en nulls first
+           limit least(greatest(p_max, 0), 50)
+  loop
+    perform public.riesgo_guardar(v);
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+revoke all on function public.riesgo_refrescar(integer) from public;
+grant execute on function public.riesgo_refrescar(integer) to anonymous;
+
+-- El mapa público suma la clase de riesgo de cada punto. Se agregan columnas
+-- al final: la vista base está en schema.sql.
+create or replace view public.reportes_publicos
+with (security_invoker = false)
+as
+select
+  r.id,
+  round(r.lat::numeric, 4)::double precision as lat,
+  round(r.lon::numeric, 4)::double precision as lon,
+  r.estado,
+  r.tipo,
+  coalesce(r.tamano_moderado, r.tamano) as tamano,
+  r.quema,
+  r.creado_en::date as fecha,
+  (r.foto is not null and r.foto_aprobada) as tiene_foto,
+  c.clase as riesgo_clase,
+  c.total as riesgo_total
+from public.reportes r
+left join public.riesgo_cache c on c.reporte_id = r.id
+where r.estado in ('verificado', 'en_gestion');
+grant select on public.reportes_publicos to anonymous;
+
 -- =====================================================================
 -- Prueba manual:
 --   select jsonb_pretty(public.riesgo_basural('<id de un reporte verificado>'));
--- Cambiar pesos o radios:
+-- Cambiar pesos o radios (y después recalcular lo guardado):
 --   update public.parametros_riesgo set peso_vulnerabilidad = 0.35, peso_reportes = 0.15;
+--   select public.riesgo_recalcular_todo();
 -- =====================================================================

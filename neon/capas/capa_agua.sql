@@ -823,4 +823,7 @@ insert into public.capa_agua (nombre, tipo, regimen, capa, geom) values
   (null, 'Canal', null, 'OSM waterway=canal', gis.st_setsrid(gis.st_geomfromgeojson('{"type":"MultiLineString","coordinates":[[[-58.918235,-27.4672626],[-58.9179548,-27.4674358]]]}'), 4326)),
   (null, 'Zanja', null, 'OSM waterway=ditch', gis.st_setsrid(gis.st_geomfromgeojson('{"type":"MultiLineString","coordinates":[[[-58.9162137,-27.4725954],[-58.9163786,-27.4720433]]]}'), 4326));
 
+-- Índice guardado de los activos, con la capa nueva
+select public.riesgo_recalcular_todo();
+
 commit;

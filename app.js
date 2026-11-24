@@ -30,8 +30,19 @@ const subirReporte = (fila) => api('/reportes', { method: 'POST', body: JSON.str
 const FOTO_LADO_MAX = 1000;      // px
 const FOTO_PESO_OBJETIVO = 200_000; // bytes (la foto viaja dentro del reporte)
 
-const COLORES = { verificado: '#e03131', en_gestion: '#f59f00', resuelto: '#2f9e44' };
-const NOMBRES_ESTADO = { verificado: 'Activo', en_gestion: 'En gestión', resuelto: 'Resuelto' };
+// Color del punto: clase del índice de riesgo (los mismos colores de la leyenda, del tema).
+// Tamaño del punto: tamaño del basural.
+const tema = getComputedStyle(document.documentElement);
+const colorTema = (variable, porDefecto) => tema.getPropertyValue(variable).trim() || porDefecto;
+const COLOR_RIESGO = {
+  alto: colorTema('--rojo', '#e03131'), medio: colorTema('--ambar', '#f59f00'), bajo: colorTema('--verde', '#2f9e44'),
+};
+const SIN_CALCULAR = '#8a9496';
+const NOMBRE_RIESGO = { alto: 'Riesgo alto', medio: 'Riesgo medio', bajo: 'Riesgo bajo' };
+const RADIO_TAMANO = { bolsas: 6, carretilla: 8, camioneta: 10.5, camion_o_mas: 14 };
+const NOMBRE_TAMANO = {
+  bolsas: 'unas bolsas', carretilla: 'una carretilla', camioneta: 'una camioneta', camion_o_mas: 'un camión o más',
+};
 const NOMBRES_TIPO = {
   domiciliario: 'Domiciliario', verde_poda: 'Verde / poda', escombros: 'Escombros',
   neumaticos: 'Neumáticos', mixto: 'Mezcla', otro: 'Otro',
@@ -72,10 +83,14 @@ async function cargarReportesPublicos() {
   } catch (err) { console.warn('No se pudo cargar el mapa público', err); return; }
 
   capaPublica.clearLayers();
-  for (const r of data) {
-    const color = COLORES[r.estado] || '#888';
+  // Los grandes primero, para que los chicos queden arriba y se puedan tocar
+  const orden = [...data].sort((a, b) => (RADIO_TAMANO[b.tamano] || 8) - (RADIO_TAMANO[a.tamano] || 8));
+  for (const r of orden) {
     const marcador = L.circleMarker([r.lat, r.lon], {
-      radius: 10, color: '#fff', weight: 3, fillColor: color, fillOpacity: 1,
+      radius: RADIO_TAMANO[r.tamano] || 8, color: '#fff', weight: 2.5,
+      fillColor: COLOR_RIESGO[r.riesgo_clase] || SIN_CALCULAR, fillOpacity: 1,
+      // sin tamaño informado: borde punteado
+      dashArray: r.tamano ? null : '3 3',
     });
     marcador.bindPopup(htmlPopup(r, null), {
       maxWidth: 300, minWidth: 260,
@@ -142,8 +157,8 @@ function htmlPopup(r, riesgo) {
   const tipo = r.tipo ? `${NOMBRES_TIPO[r.tipo] || r.tipo}, reportado el ${fecha}` : `Reportado el ${fecha}`;
   const cabecera = `
     <div class="rz-cab">
-      <b><i class="luz" style="display:inline-block;margin-right:7px;vertical-align:1px;background:${COLORES[r.estado] || '#888'}"></i>${NOMBRES_ESTADO[r.estado] || r.estado}</b>
-      <span>${tipo}</span>
+      <b><i class="luz" style="display:inline-block;margin-right:7px;vertical-align:1px;background:${COLOR_RIESGO[r.riesgo_clase] || SIN_CALCULAR}"></i>${NOMBRE_RIESGO[r.riesgo_clase] || 'Riesgo sin calcular'}</b>
+      <span>${tipo}${r.tamano ? `. Tamaño: ${NOMBRE_TAMANO[r.tamano]}` : ''}</span>
     </div>`;
 
   // Hueco para la foto: lo completa cargarFoto() cuando llega la imagen

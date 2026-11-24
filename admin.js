@@ -4,9 +4,10 @@
 import { armarZip } from './admin-zip.js';
 import { htmlIndice } from './indice.js';
 
+// "en_gestion" quedó en desuso (2026-11-24): si apareciera, cuenta como activo
 const ESTADOS = {
-  pendiente: 'Pendiente', verificado: 'Activo', en_gestion: 'En gestión',
-  resuelto: 'Resuelto', descartado: 'Descartado',
+  pendiente: 'Pendiente', verificado: 'Activo', en_gestion: 'Activo',
+  resuelto: 'Ya no está', descartado: 'Descartado',
 };
 const TIPOS = {
   domiciliario: 'Domiciliario', verde_poda: 'Poda', escombros: 'Escombros',
@@ -104,9 +105,17 @@ $('btn-salir').addEventListener('click', async () => {
 // ---------------------------------------------------------------------
 // Visor: todos los reportes en el mapa, en sus coordenadas exactas
 // ---------------------------------------------------------------------
-const COLORES = {
-  pendiente: '#3b5bdb', verificado: '#e03131', en_gestion: '#f59f00', resuelto: '#2f9e44', descartado: '#868e96',
+const COLORES = { pendiente: '#3b5bdb', resuelto: '#b3a68f', descartado: '#868e96' };
+// Activos: color por clase de riesgo y tamaño por tamaño del basural, como en el mapa público
+// Los mismos tonos del mapa público (los del tema)
+const tema = getComputedStyle(document.documentElement);
+const colorTema = (variable, porDefecto) => tema.getPropertyValue(variable).trim() || porDefecto;
+const COLOR_RIESGO = {
+  alto: colorTema('--rojo', '#e03131'), medio: colorTema('--ambar', '#f59f00'), bajo: colorTema('--verde', '#2f9e44'),
 };
+const SIN_CALCULAR = '#8a9496';
+const RADIO_TAMANO = { bolsas: 5, carretilla: 6.5, camioneta: 8.5, camion_o_mas: 11.5 };
+const esActivo = (r) => r.estado === 'verificado' || r.estado === 'en_gestion';
 // Orden de dibujo: lo que hay que revisar queda arriba de todo
 const ORDEN_DIBUJO = ['descartado', 'resuelto', 'en_gestion', 'verificado', 'pendiente'];
 const CENTRO = [-27.4606, -58.9839];
@@ -116,7 +125,10 @@ let reportes = [];
 let cantidades = {};
 let seleccionado = null;
 let copiaAtrasada = false;
-const visibles = new Set(['pendiente', 'verificado', 'en_gestion', 'resuelto']);   // descartados, apagados
+const visibles = new Set(['pendiente', 'verificado']);   // "ya no están" y descartados, apagados
+// en_gestion (en desuso) sigue a la capa de activos
+const capaDe = (estado) => (estado === 'en_gestion' ? 'verificado' : estado);
+const seVe = (r) => visibles.has(capaDe(r.estado));
 let mapa = null;
 let capaPuntos = null;
 let anillo = null;
@@ -172,7 +184,7 @@ async function cargarTodo({ alAbrir = false } = {}) {
 }
 
 function encuadrar() {
-  const puntos = reportes.filter((r) => visibles.has(r.estado)).map((r) => [r.lat, r.lon]);
+  const puntos = reportes.filter(seVe).map((r) => [r.lat, r.lon]);
   if (!puntos.length) return;
   mapa.fitBounds(puntos, {
     maxZoom: 15, paddingTopLeft: [40, 40], paddingBottomRight: [40, esCelular() ? ALTO_HOJA_BAJA + 30 : 40],
@@ -182,25 +194,41 @@ function encuadrar() {
 function dibujarPuntos() {
   capaPuntos.clearLayers();
   for (const estado of ORDEN_DIBUJO) {
-    if (!visibles.has(estado)) continue;
-    for (const r of reportes) {
-      if (r.estado !== estado) continue;
+    if (!visibles.has(capaDe(estado))) continue;
+    const delEstado = reportes.filter((r) => r.estado === estado);
+    // Activos: los grandes primero, para que los chicos queden arriba y se puedan tocar
+    if (estado === 'verificado' || estado === 'en_gestion') delEstado.sort((a, b) => radioActivo(b) - radioActivo(a));
+    for (const r of delEstado) {
       const pendiente = estado === 'pendiente';
       const descartado = estado === 'descartado';
+      const activo = esActivo(r);
       const punto = L.circleMarker([r.lat, r.lon], {
-        radius: pendiente ? 9 : 7,
+        radius: pendiente ? 9 : activo ? radioActivo(r) : 6,
         weight: pendiente ? 3 : 2,
         color: descartado ? COLORES.descartado : '#fff',
-        fillColor: COLORES[estado],
-        fillOpacity: descartado ? 0.3 : 1,
+        fillColor: activo ? (COLOR_RIESGO[r.riesgo_clase] || SIN_CALCULAR) : COLORES[estado],
+        fillOpacity: descartado ? 0.3 : estado === 'resuelto' ? 0.7 : 1,
+        dashArray: activo && !(r.tamano_moderado || r.tamano) ? '3 3' : null,
       });
-      punto.bindTooltip(`${ESTADOS[estado]}, ${formatoCorto.format(new Date(r.creado_en))}`,
+      const riesgo = activo && r.riesgo_clase ? `, riesgo ${r.riesgo_clase}` : '';
+      punto.bindTooltip(`${ESTADOS[estado]}${riesgo}, ${formatoCorto.format(new Date(r.creado_en))}`,
         { direction: 'top', offset: [0, -8], className: 'etiqueta-reporte' });
       punto.on('click', () => seleccionar(r.id, { desdeMapa: true }));
       punto.addTo(capaPuntos);
     }
   }
   marcarSeleccion();
+}
+
+function radioActivo(r) {
+  return RADIO_TAMANO[r.tamano_moderado || r.tamano] || 7;
+}
+
+// Después de moderar o eliminar: el servidor devuelve las clases de riesgo guardadas
+function actualizarRiesgos(riesgos) {
+  if (!Array.isArray(riesgos)) return;
+  const clase = new Map(riesgos.map((x) => [x.id, x.clase]));
+  for (const r of reportes) r.riesgo_clase = clase.get(r.id) ?? null;
 }
 
 function marcarSeleccion() {
@@ -235,7 +263,7 @@ function pintarResumen() {
 }
 
 function pintarLista() {
-  const filas = reportes.filter((r) => visibles.has(r.estado));
+  const filas = reportes.filter(seVe);
   $('lista').replaceChildren(...filas.map(fila));
   $('vacio').hidden = filas.length > 0;
   $('vacio').textContent = reportes.length ? 'No hay reportes en las capas prendidas.' : 'Todavía no llegó ningún reporte.';
@@ -247,9 +275,11 @@ function fila(r) {
   boton.className = 'fila';
   boton.dataset.estado = r.estado;
   boton.dataset.id = r.id;
+  // Activos: el punto de la fila con el color de su riesgo, como en el mapa
+  if (esActivo(r)) boton.style.setProperty('--color', COLOR_RIESGO[r.riesgo_clase] || SIN_CALCULAR);
   const titulo = document.createElement('span');
   titulo.className = 'fila-titulo';
-  titulo.textContent = ESTADOS[r.estado];
+  titulo.textContent = esActivo(r) && r.riesgo_clase ? `Activo, riesgo ${r.riesgo_clase}` : ESTADOS[r.estado];
   const fecha = document.createElement('time');
   fecha.dateTime = r.creado_en;
   fecha.textContent = formatoCorto.format(new Date(r.creado_en));
@@ -522,7 +552,8 @@ function sacarDeLaVista(r) {
 async function eliminar(el, r) {
   el.classList.add('ocupada');
   try {
-    await api('/reportes', { method: 'DELETE', body: JSON.stringify({ id: r.id }) });
+    const { riesgos } = await api('/reportes', { method: 'DELETE', body: JSON.stringify({ id: r.id }) });
+    actualizarRiesgos(riesgos);
     sacarDeLaVista(r);
     aviso('Reporte eliminado.');
   } catch (err) {
@@ -585,7 +616,9 @@ async function accion(el, r, boton) {
   try {
     const nuevo = await api('/reportes', { method: 'PATCH', body: JSON.stringify({ id: r.id, ...cambio }) });
     const anterior = r.estado;
-    Object.assign(r, nuevo);
+    const { riesgos, ...cambios } = nuevo;
+    Object.assign(r, cambios);
+    actualizarRiesgos(riesgos);
     if (anterior !== r.estado) {
       cantidades[anterior] = Math.max(0, (cantidades[anterior] || 0) - 1);
       cantidades[r.estado] = (cantidades[r.estado] || 0) + 1;
@@ -703,8 +736,8 @@ function leeme(reportes, fotos, faltantes, ahora) {
     'CAMPOS',
     '  id               Identificador del reporte (lo genera el celular del vecino).',
     '  creado_en        Cuándo llegó (UTC en el GeoJSON).',
-    '  estado           pendiente, verificado (activo, rojo), en_gestion (amarillo),',
-    '                   resuelto (verde) o descartado.',
+    '  estado           pendiente, verificado (activo: se ve en el mapa),',
+    '                   resuelto (ya no está: no se ve) o descartado.',
     '  tipo, tamano, antiguedad, quema, cerca_agua, cerca_escuela',
     '                   Relevamiento opcional del vecino.',
     '  tamano_moderado  Tamaño corregido por el moderador mirando la foto (vacío',

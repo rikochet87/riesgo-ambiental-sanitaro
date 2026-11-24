@@ -97,6 +97,7 @@ def punto(geom):
     return lon, lat
 
 
+RECALCULAR_CAPA = "\n-- Índice guardado de los activos, con la capa nueva\nselect public.riesgo_recalcular_todo();"
 partes = ["-- Generado por scripts/06_sql_capas.py. No editar a mano: volver a correr el script.",
           "begin;"]
 for tabla, ruta, extras in CAPAS:
@@ -117,8 +118,11 @@ for tabla, ruta, extras in CAPAS:
     partes += bloque
     os.makedirs(POR_CAPA, exist_ok=True)
     with open(os.path.join(POR_CAPA, f"{tabla}.sql"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join([partes[0], "begin;"] + bloque + ["\ncommit;\n"]))
+        f.write("\n".join([partes[0], "begin;"] + bloque + [RECALCULAR_CAPA, "\ncommit;\n"]))
     print(f"{tabla}: {len(filas)} entidades")
+# Recalcular el índice guardado de los basurales activos (el mapa se pinta por riesgo)
+RECALCULAR = "\n-- Índice guardado de los activos, con las capas nuevas\nselect public.riesgo_recalcular_todo();"
+partes.append(RECALCULAR)
 partes.append("\ncommit;\n")
 
 with open(SALIDA, "w", encoding="utf-8", newline="\n") as f:

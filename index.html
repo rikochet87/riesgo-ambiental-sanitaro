@@ -55,10 +55,10 @@
 
   <!-- Panel inferior: semáforo + acción principal -->
   <section class="dock" aria-label="Referencias y acción principal">
-    <ul class="semaforo" aria-label="Estado de los basurales en el mapa">
-      <li><i class="luz luz-rojo"></i>Activo</li>
-      <li><i class="luz luz-ambar"></i>En gestión</li>
-      <li><i class="luz luz-verde"></i>Resuelto</li>
+    <ul class="semaforo" aria-label="Riesgo ambiental y sanitario de cada basural">
+      <li><i class="luz luz-rojo"></i>Riesgo alto</li>
+      <li><i class="luz luz-ambar"></i>Medio</li>
+      <li><i class="luz luz-verde"></i>Bajo</li>
     </ul>
     <button id="btn-denunciar" class="btn-lapacho">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
@@ -177,13 +177,14 @@
     <ol class="pasos">
       <li><b>Denunciá.</b> Tocá el botón verde y ubicá el pin sobre el basural.</li>
       <li><b>Sumá datos si podés.</b> Una foto y unos pocos datos ayudan a priorizar.</li>
-      <li><b>Seguilo en el mapa.</b> Después de revisarlo aparece con su color.</li>
+      <li><b>Seguilo en el mapa.</b> Después de revisarlo aparece con el color de su riesgo.</li>
     </ol>
     <ul class="semaforo semaforo-dialogo">
-      <li><i class="luz luz-rojo"></i>Activo</li>
-      <li><i class="luz luz-ambar"></i>En gestión</li>
-      <li><i class="luz luz-verde"></i>Resuelto</li>
+      <li><i class="luz luz-rojo"></i>Riesgo alto</li>
+      <li><i class="luz luz-ambar"></i>Medio</li>
+      <li><i class="luz luz-verde"></i>Bajo</li>
     </ul>
+    <p class="dialogo-nota tamanos"><span class="puntos" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Cuanto más grande el punto, más grande el basural. Con borde punteado: sin tamaño informado.</p>
     <p class="dialogo-nota">Tocá un punto del mapa para ver su riesgo ambiental y sanitario. Sin señal, el reporte se guarda en tu celular y se envía solo al volver la conexión.</p>
     <form method="dialog"><button class="btn-petroleo ancho">Entendido</button></form>
   </dialog>

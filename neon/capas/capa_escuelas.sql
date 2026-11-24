@@ -362,4 +362,7 @@ insert into public.capa_escuelas (nombre, geom) values
   ('Unidad Educativa de Gestión Privada Nº 157 Centro de Estudios Psicosociales del Chaco', gis.st_setsrid(gis.st_makepoint(-58.9705269, -27.4648684), 4326)),
   ('Unidad Educativa de Gestión Privada Nº 1165 Paulo Freire', gis.st_setsrid(gis.st_makepoint(-58.9806564, -27.4482688), 4326));
 
+-- Índice guardado de los activos, con la capa nueva
+select public.riesgo_recalcular_todo();
+
 commit;

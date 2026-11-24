@@ -216,6 +216,57 @@ test('el público no puede mandar un tamaño corregido', async () => {
   await admin('delete from public.reportes where id = $1', [id]);
 });
 
+test('mapa por riesgo: moderar recalcula el reporte y sus vecinos; "ya no está" sale del mapa', async () => {
+  const cookie = await sesion();
+  const VECINO = '77777777-7777-4777-8777-777777777777';
+  const patch = async (id, cuerpo) => leer(await moderar.PATCH(pedir('/api/admin/reportes',
+    { metodo: 'PATCH', cuerpo: { id, ...cuerpo }, cookie, origen: SITIO })));
+  const guardado = async (id) => (await admin('select total, clase from public.riesgo_cache where reporte_id = $1', [id]))[0];
+  const enMapa = async () => (await (await reportesPublicos.GET(pedir('/api/reportes'))).json()).map((x) => x.id);
+
+  await admin(`update public.reportes set estado = 'verificado' where id = $1`, [ID_FOTO]);
+  const r0 = await patch(ID_FOTO, { nota_admin: 'recalcular' });
+  assert.equal(r0.estado, 200);
+  assert.ok(r0.cuerpo.riesgos.some((x) => x.id === ID_FOTO && x.clase), 'la respuesta trae las clases para repintar');
+  const solo = await guardado(ID_FOTO);
+
+  // Un vecino a ~60 m: al publicarlo, el índice del primero sube (un activo más cerca)
+  const alta = await reportesPublicos.POST(new Request(SITIO + '/api/reportes', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: VECINO, lat: -27.4605, lon: -58.9805 }),
+  }));
+  assert.equal(alta.status, 201);
+  assert.equal(await guardado(VECINO), undefined, 'un pendiente no tiene índice guardado');
+  await patch(VECINO, { estado: 'verificado' });
+  assert.ok((await guardado(VECINO)).clase);
+  assert.ok((await guardado(ID_FOTO)).total > solo.total, 'el vecino publicado cuenta en el índice del primero');
+
+  // "Ya no está" (resuelto): sale del mapa, de la foto y del índice público, y el primero vuelve a bajar
+  await patch(VECINO, { estado: 'resuelto' });
+  assert.equal(await guardado(VECINO), undefined);
+  assert.deepEqual(await guardado(ID_FOTO), solo);
+  assert.ok(!(await enMapa()).includes(VECINO));
+  assert.equal(await (await riesgoPublico.GET(pedir(`/api/riesgo?id=${VECINO}`))).json(), null);
+
+  // Eliminar también recalcula a los vecinos
+  await patch(VECINO, { estado: 'verificado' });
+  assert.ok((await guardado(ID_FOTO)).total > solo.total);
+  const borrado = await leer(await moderar.DELETE(pedir('/api/admin/reportes',
+    { metodo: 'DELETE', cuerpo: { id: VECINO }, cookie, origen: SITIO })));
+  assert.equal(borrado.estado, 200);
+  assert.deepEqual(await guardado(ID_FOTO), solo);
+  assert.ok(!borrado.cuerpo.riesgos.some((x) => x.id === VECINO));
+});
+
+test('una foto aprobada de un basural que "ya no está" no se sirve al público', async () => {
+  await admin(`update public.reportes set estado = 'resuelto', foto_aprobada = true where id = $1`, [ID_FOTO]);
+  try {
+    assert.equal(await (await fotoPublica.GET(pedir(`/api/foto?id=${ID_FOTO}`))).json(), null);
+  } finally {
+    await admin(`update public.reportes set estado = 'verificado' where id = $1`, [ID_FOTO]);
+  }
+});
+
 test('pedidos inválidos: estado inventado, id inexistente, solo campos no permitidos, nota larga', async () => {
   const cookie = await sesion();
   const casos = [

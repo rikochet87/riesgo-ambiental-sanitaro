@@ -59,8 +59,7 @@
       <nav class="filtros" aria-label="Capas por estado">
         <button data-estado="pendiente" aria-pressed="true"><i aria-hidden="true"></i>Pendientes <b data-n="pendiente">0</b></button>
         <button data-estado="verificado" aria-pressed="true"><i aria-hidden="true"></i>Activos <b data-n="verificado">0</b></button>
-        <button data-estado="en_gestion" aria-pressed="true"><i aria-hidden="true"></i>En gestión <b data-n="en_gestion">0</b></button>
-        <button data-estado="resuelto" aria-pressed="true"><i aria-hidden="true"></i>Resueltos <b data-n="resuelto">0</b></button>
+        <button data-estado="resuelto" aria-pressed="false"><i aria-hidden="true"></i>Ya no están <b data-n="resuelto">0</b></button>
         <button data-estado="descartado" aria-pressed="false"><i aria-hidden="true"></i>Descartados <b data-n="descartado">0</b></button>
       </nav>
 
@@ -123,9 +122,8 @@
         <label class="campo">
           <span>Estado</span>
           <select>
-            <option value="verificado">Activo (rojo)</option>
-            <option value="en_gestion">En gestión (amarillo)</option>
-            <option value="resuelto">Resuelto (verde)</option>
+            <option value="verificado">Activo (se ve en el mapa)</option>
+            <option value="resuelto">Ya no está (deja de verse)</option>
             <option value="descartado">Descartado (no se muestra)</option>
             <option value="pendiente">Volver a pendiente</option>
           </select>

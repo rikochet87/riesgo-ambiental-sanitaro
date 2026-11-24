@@ -8,6 +8,8 @@ import { controlar, leerJSON } from '../_admin.js';
 
 const ESTADOS = ['pendiente', 'verificado', 'en_gestion', 'resuelto', 'descartado'];
 const TAMANOS = ['bolsas', 'carretilla', 'camioneta', 'camion_o_mas'];
+// Clases de riesgo guardadas, para repintar el mapa del panel después de moderar
+const RIESGOS = 'select reporte_id as id, clase from public.riesgo_cache';
 const POR_PAGINA = 1000;
 
 export async function GET(request) {
@@ -22,10 +24,11 @@ export async function GET(request) {
 
   try {
     const [filas, conteo, [copia]] = await comoModerador([
-      [`select id, creado_en, lat, lon, tipo, tamano, tamano_moderado, quema, cerca_agua, cerca_escuela,
-               antiguedad, descripcion, estado, foto_aprobada, (foto is not null) as tiene_foto,
-               revisado_en, nota_admin
-        from public.reportes
+      [`select r.id, r.creado_en, r.lat, r.lon, r.tipo, r.tamano, r.tamano_moderado, r.quema, r.cerca_agua,
+               r.cerca_escuela, r.antiguedad, r.descripcion, r.estado, r.foto_aprobada,
+               (r.foto is not null) as tiene_foto, r.revisado_en, r.nota_admin, c.clase as riesgo_clase
+        from public.reportes r
+        left join public.riesgo_cache c on c.reporte_id = r.id
         where $1 = 'todos' or estado = $1
         order by creado_en desc, id
         limit $2 offset $3`, [estado, POR_PAGINA + 1, pagina * POR_PAGINA]],
@@ -79,15 +82,18 @@ export async function PATCH(request) {
   cambios.push('revisado_en = now()');
 
   try {
-    const [filas] = await comoModerador([[
-      `update public.reportes set ${cambios.join(', ')}
-       where id = $1
-       returning id, estado, foto_aprobada, (foto is not null) as tiene_foto, revisado_en, nota_admin,
-                 tamano_moderado`,
-      valores,
-    ]]);
+    const [filas, , riesgos] = await comoModerador([
+      [`update public.reportes set ${cambios.join(', ')}
+        where id = $1
+        returning id, estado, foto_aprobada, (foto is not null) as tiene_foto, revisado_en, nota_admin,
+                  tamano_moderado`,
+       valores],
+      // El índice guardado de este reporte y de sus vecinos (el mapa se pinta por riesgo)
+      ['select public.riesgo_recalcular_zona(id, lat, lon) from public.reportes where id = $1', [datos.id]],
+      [RIESGOS, []],
+    ]);
     if (!filas.length) return json({ code: 'NO_EXISTE', message: 'Ese reporte no existe.' }, 404);
-    return json(filas[0]);
+    return json({ ...filas[0], riesgos });
   } catch (err) {
     return errorDeBase(err);
   }
@@ -103,10 +109,15 @@ export async function DELETE(request) {
 
   try {
     const [filas] = await comoModerador([[
-      'delete from public.reportes where id = $1 returning id, estado', [datos.id],
+      'delete from public.reportes where id = $1 returning id, estado, lat, lon', [datos.id],
     ]]);
     if (!filas.length) return json({ code: 'NO_EXISTE', message: 'Ese reporte ya no existe.' }, 404);
-    return json({ eliminado: filas[0].id, estado: filas[0].estado });
+    // Sin este reporte, sus vecinos tienen un activo menos cerca
+    const [, riesgos] = await comoModerador([
+      ['select public.riesgo_recalcular_zona($1, $2, $3)', [filas[0].id, filas[0].lat, filas[0].lon]],
+      [RIESGOS, []],
+    ]);
+    return json({ eliminado: filas[0].id, estado: filas[0].estado, riesgos });
   } catch (err) {
     return errorDeBase(err);
   }

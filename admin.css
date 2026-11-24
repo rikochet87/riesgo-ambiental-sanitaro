@@ -1,12 +1,12 @@
 /* Panel de moderación: visor con todos los reportes.
    Usa las variables y botones de styles.css y del tema. */
 
-/* Colores por estado: los del semáforo público, más los dos que solo ve el moderador */
+/* Colores por estado. Los activos, en el mapa, van pintados por riesgo (como el
+   mapa público): su botón muestra los tres colores. */
 :root {
   --e-pendiente: #3b5bdb;
   --e-verificado: #e03131;
-  --e-en_gestion: #f59f00;
-  --e-resuelto: #2f9e44;
+  --e-resuelto: #b3a68f;
   --e-descartado: #868e96;
 }
 
@@ -63,9 +63,11 @@ body.admin { height: 100vh; height: 100dvh; }
 .filtros button b { font-variant-numeric: tabular-nums; color: var(--texto-suave); font-weight: 700; }
 .filtros button[aria-pressed="false"] { color: var(--texto-suave); background: transparent; border-style: dashed; }
 .filtros button[aria-pressed="false"] i { background: transparent; }
+.filtros button[data-estado="verificado"][aria-pressed="true"] i {
+  background: conic-gradient(var(--rojo) 0 33%, var(--ambar) 0 66%, var(--verde) 0);
+}
 [data-estado="pendiente"]  { --color: var(--e-pendiente); }
 [data-estado="verificado"] { --color: var(--e-verificado); }
-[data-estado="en_gestion"] { --color: var(--e-en_gestion); }
 [data-estado="resuelto"]   { --color: var(--e-resuelto); }
 [data-estado="descartado"] { --color: var(--e-descartado); }
 
