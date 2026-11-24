@@ -1,5 +1,5 @@
 const PREFIJO = 'basurales-publico-';
-const CACHE = PREFIJO + '4';
+const CACHE = PREFIJO + '5';
 const BASE = [
   '/', '/styles.css', '/temas/tema-monte.css', '/app.js', '/config.js', '/indice.js',
   '/pwa.js', '/manifest.webmanifest', '/img/app-192.png', '/img/app-512.png',

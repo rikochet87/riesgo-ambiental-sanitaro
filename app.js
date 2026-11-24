@@ -184,6 +184,8 @@ function htmlPopup(r, riesgo) {
 // ---------------------------------------------------------------------
 let ubicacionElegida = null;
 let fotoProcesada = null;
+let seleccionFoto = 0;
+let procesandoFoto = false;
 
 function entrarModoUbicacion() {
   document.body.classList.add('eligiendo');
@@ -239,8 +241,10 @@ function cerrarHoja() {
   document.body.classList.remove('con-hoja');
   $('form').reset();
   $('foto-preview').hidden = true;
+  if ($('foto-preview').hasAttribute('src')) URL.revokeObjectURL($('foto-preview').src);
   $('foto-preview').removeAttribute('src');
-  $('btn-foto-texto').textContent = 'Sacar o elegir foto';
+  seleccionFoto++;
+  procesandoFoto = false;
   fotoProcesada = null;
   ubicacionElegida = null;
 }
@@ -294,20 +298,25 @@ async function comprimirFoto(file) {
 }
 
 async function alElegirFoto(e) {
-  const file = e.target.files && e.target.files[0];
-  fotoProcesada = null;
-  $('foto-preview').hidden = true;
+  const file = e.target.files[0];
   if (!file) return;
+  e.target.value = '';
+  const seleccion = ++seleccionFoto;
+  const vista = $('foto-preview');
+  procesandoFoto = true;
   try {
     const procesada = await comprimirFoto(file);
+    if (seleccion !== seleccionFoto) return;
+    if (vista.hasAttribute('src')) URL.revokeObjectURL(vista.src);
     fotoProcesada = procesada.base64;
-    $('foto-preview').src = URL.createObjectURL(procesada.blob);
-    $('foto-preview').hidden = false;
-    $('btn-foto-texto').textContent = 'Cambiar foto';
+    vista.src = URL.createObjectURL(procesada.blob);
+    vista.hidden = false;
   } catch (err) {
+    if (seleccion !== seleccionFoto) return;
     console.error(err);
-    e.target.value = '';
     aviso('No pudimos leer esa foto. Probá con otra.', true);
+  } finally {
+    if (seleccion === seleccionFoto) procesandoFoto = false;
   }
 }
 
@@ -380,6 +389,7 @@ async function alEnviar(e) {
   // Bot: completó el campo trampa. Simulamos éxito y no enviamos nada.
   if (form.sitio_web.value) { cerrarHoja(); aviso('¡Gracias! Tu reporte fue enviado.'); return; }
   if (!ubicacionElegida) { aviso('Falta elegir la ubicación.', true); return; }
+  if (procesandoFoto) { aviso('Esperá a que aparezca la vista previa de la foto.'); return; }
 
   const id = crypto.randomUUID();
   const datos = {
@@ -473,6 +483,7 @@ $('btn-cancelar-ubic').addEventListener('click', salirModoUbicacion);
 $('btn-confirmar-ubic').addEventListener('click', confirmarUbicacion);
 $('btn-cerrar').addEventListener('click', cerrarHoja);
 $('foto').addEventListener('change', alElegirFoto);
+$('foto-camara').addEventListener('change', alElegirFoto);
 $('form').addEventListener('submit', alEnviar);
 $('btn-info').addEventListener('click', () => $('dlg-info').showModal());
 window.addEventListener('online', reintentarPendientes);

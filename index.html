@@ -107,15 +107,22 @@
         </button>
       </div>
 
-      <label class="campo-foto">
-        <input type="file" id="foto" accept="image/*">
-        <span class="btn-foto">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
-          <span id="btn-foto-texto">Sacar o elegir foto</span>
-          <small>opcional</small>
-        </span>
+      <div class="campo-foto">
+        <div class="opciones-foto" role="group" aria-label="Foto opcional">
+          <label>
+            <input type="file" id="foto-camara" accept="image/*" capture="environment">
+            <span class="btn-foto">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.3" fill="none" stroke="currentColor" stroke-width="1.9"/></svg>
+              Sacar foto
+            </span>
+          </label>
+          <label>
+            <input type="file" id="foto" accept="image/*">
+            <span class="btn-foto">Elegir foto</span>
+          </label>
+        </div>
         <img id="foto-preview" alt="Vista previa de la foto" hidden>
-      </label>
+      </div>
 
       <details class="relevamiento">
         <summary>

@@ -181,6 +181,8 @@ button:focus-visible, input:focus-visible + span, textarea:focus-visible, summar
 
 /* Foto */
 .campo-foto { display: block; margin-bottom: 12px; }
+.opciones-foto { display: flex; flex-wrap: wrap; gap: 8px; }
+.opciones-foto label { flex: 1 0 auto; }
 .campo-foto input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .btn-foto {
   display: flex; align-items: center; gap: 10px;
@@ -188,7 +190,7 @@ button:focus-visible, input:focus-visible + span, textarea:focus-visible, summar
   border: 2px dashed #9cc4ca; background: var(--petroleo-claro); color: var(--petroleo);
   font-weight: 700; cursor: pointer;
 }
-.btn-foto small { margin-left: auto; font-weight: 500; color: var(--texto-suave); }
+.opciones-foto .btn-foto { justify-content: center; min-height: 54px; padding: 10px; }
 .campo-foto input:focus-visible + .btn-foto { outline: 3px solid var(--lapacho); outline-offset: 2px; }
 #foto-preview { display: block; margin-top: 10px; width: 100%; max-height: 200px; object-fit: cover; border-radius: var(--radio-m); }
 
