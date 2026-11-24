@@ -46,7 +46,7 @@
  */
 
 // ------------------------------------------------------------------ Ajustes
-var PUNTOS = 'projects/chaco/assets/reportes_ee';   // ← la ruta de tu recurso
+var PUNTOS = 'projects/chaco-2727/assets/reportes_ee';   // ← la ruta de tu recurso
 var RADIO_M = 60;              // círculo alrededor de cada reporte
 var DIAS_ANTES = 45;           // ventana para la referencia "antes"
 var UMBRAL_DNBR = 0.25;        // caída del NBR que cuenta como quema
