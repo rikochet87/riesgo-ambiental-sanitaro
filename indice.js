@@ -27,10 +27,11 @@ export function htmlIndice(riesgo) {
 
   const a = riesgo.amenaza, e = riesgo.exposicion, v = riesgo.vulnerabilidad, rv = riesgo.reportes, w = riesgo.pesos;
 
-  const detAmenaza = a.fuente === 'satelite'
-    ? [a.area_m2 != null ? `${fmt(Math.round(a.area_m2))} m²` : null,
-       a.quemas_12m != null ? `${a.quemas_12m} quema(s) en 12 meses` : null,
-       a.crecimiento_pct != null ? `crece ${fmt(a.crecimiento_pct)}%/año` : null].filter(Boolean).join(', ') + ' (satélite)'
+  const satelite = [a.area_m2 != null ? `${fmt(Math.round(a.area_m2))} m²` : null,
+    a.quemas_12m != null ? `${a.quemas_12m} quema(s) detectada(s) en 12 meses` : null,
+    a.crecimiento_pct != null ? `crece ${fmt(a.crecimiento_pct)}%/año` : null].filter(Boolean).join(', ');
+  const detAmenaza = a.fuente === 'satelite' ? satelite + ' (satélite)'
+    : a.fuente === 'mixta' ? `Relevamiento vecinal y satélite: ${satelite}`
     : 'Estimada con el relevamiento vecinal (aún sin análisis satelital)';
 
   const detExpo = e.puntaje == null

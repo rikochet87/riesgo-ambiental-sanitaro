@@ -159,6 +159,41 @@ test('una vez verificado: aparece en el mapa con fecha AAAA-MM-DD, y entrega fot
   assert.equal(ri.cuerpo.amenaza.fuente, 'relevamiento');
 });
 
+test('el satélite completa cada dato por separado: solo quemas -> fuente mixta', async () => {
+  // ID_1 (verificado) lo cargó el vecino como camioneta (0,6), con quema y de hace meses (0,7).
+  // Para ver cómo se combinan las quemas, se marca un rato sin quema.
+  const amenaza = async () => (await leer(await riesgo.GET(pedir(`/api/riesgo?id=${ID_1}`)))).cuerpo.amenaza;
+  const solo = (a) => ({ fuente: a.fuente, tamano: a.tamano, quemas: a.quemas, crecimiento: a.crecimiento });
+
+  assert.deepEqual(solo(await amenaza()), { fuente: 'relevamiento', tamano: 0.6, quemas: 1, crecimiento: 0.7 },
+    'sin fila satelital, todo sale del vecino');
+
+  await admin('update public.reportes set quema = false where id = $1', [ID_1]);
+  try {
+    assert.equal((await amenaza()).quemas, 0);
+
+    await admin('insert into public.amenaza_satelital (reporte_id) values ($1)', [ID_1]);
+    assert.deepEqual(solo(await amenaza()), { fuente: 'relevamiento', tamano: 0.6, quemas: 0, crecimiento: 0.7 },
+      'una fila satelital vacía no cambia nada');
+
+    await admin('update public.amenaza_satelital set quemas_12m = 2 where reporte_id = $1', [ID_1]);
+    const a = await amenaza();
+    assert.deepEqual(solo(a), { fuente: 'mixta', tamano: 0.6, quemas: 0.5, crecimiento: 0.7 },
+      '2 quemas de un tope de 4; tamaño y antigüedad siguen siendo los del vecino');
+    assert.equal(a.quemas_12m, 2);
+
+    await admin('update public.reportes set quema = true where id = $1', [ID_1]);
+    await admin('update public.amenaza_satelital set quemas_12m = 0 where reporte_id = $1', [ID_1]);
+    assert.equal((await amenaza()).quemas, 1, 'si el satélite no ve quemas, no borra la que informó el vecino');
+
+    await admin('update public.amenaza_satelital set area_m2 = 2500, crecimiento_pct = 40 where reporte_id = $1', [ID_1]);
+    assert.deepEqual(solo(await amenaza()), { fuente: 'satelite', tamano: 0.5, quemas: 1, crecimiento: 0.4 });
+  } finally {
+    await admin('delete from public.amenaza_satelital where reporte_id = $1', [ID_1]);
+    await admin('update public.reportes set quema = true where id = $1', [ID_1]);
+  }
+});
+
 test('errores de la base que el trigger levanta a propósito', async () => {
   usarEjecutorDePrueba(async (_rol) => {
     throw Object.assign(new Error('Se alcanzó el límite de reportes por hora. Probá más tarde.'), { code: 'P0001' });

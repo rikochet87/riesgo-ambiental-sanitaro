@@ -21,3 +21,7 @@ diseno/tarjeta/tarjeta.html
 
 # Descarga cruda de Overpass (se rehace con scripts/07_agua_osm.py)
 datos/hidrografia/osm_agua.osm
+
+# Puntos privados de los reportes para Earth Engine (nunca al repo)
+reportes_ee*.csv
+quemas_basurales*.csv

@@ -149,6 +149,7 @@ declare
 
   -- amenaza
   fuente text;  a_tam numeric;  a_que numeric;  a_cre numeric;  amenaza numeric;
+  v_tam numeric;  v_que numeric;  v_cre numeric;
   -- exposición
   pob numeric;  viv numeric;  n_esc integer;  n_sal integer;  exposicion numeric;
   -- vulnerabilidad
@@ -171,21 +172,30 @@ begin
   buf := gis.st_buffer(pt, p.radio_exposicion_m)::gis.geometry;
 
   -- ---------------- 1. Amenaza ----------------
+  -- Lo que releva el vecino
+  v_tam := case r.tamano when 'bolsas' then 0.1 when 'carretilla' then 0.3
+                         when 'camioneta' then 0.6 when 'camion_o_mas' then 1.0 end;
+  v_que := case when r.quema then 1 else 0 end;
+  -- la antigüedad informada se usa como indicio de persistencia
+  v_cre := case r.antiguedad when 'dias' then 0.2 when 'semanas' then 0.4
+                             when 'meses' then 0.7 when 'mas_de_un_anio' then 1.0 end;
+
+  -- Lo que mide el satélite completa cada dato por separado (desde 2026-11-24;
+  -- antes la fila satelital reemplazaba todo). Superficie y crecimiento, si
+  -- están, reemplazan al vecino; las quemas se combinan y queda la señal más
+  -- alta, porque a 20 m por píxel al satélite se le escapan las quemas chicas.
+  -- Ojo: least(null, 1) devuelve 1 en PostgreSQL, por eso cada "case" explícito
   select * into s from public.amenaza_satelital where reporte_id = p_id;
-  if found then
-    fuente := 'satelite';
-    a_tam := least(coalesce(s.area_m2, 0) / p.area_max_m2, 1);
-    a_que := least(coalesce(s.quemas_12m, 0)::numeric / p.quemas_max, 1);
-    a_cre := greatest(least(coalesce(s.crecimiento_pct, 0) / 100.0, 1), 0);
-  else
-    fuente := 'relevamiento';
-    a_tam := case r.tamano when 'bolsas' then 0.1 when 'carretilla' then 0.3
-                           when 'camioneta' then 0.6 when 'camion_o_mas' then 1.0 end;
-    a_que := case when r.quema then 1 else 0 end;
-    -- sin satélite, la antigüedad informada se usa como indicio de persistencia
-    a_cre := case r.antiguedad when 'dias' then 0.2 when 'semanas' then 0.4
-                               when 'meses' then 0.7 when 'mas_de_un_anio' then 1.0 end;
-  end if;
+  a_tam := case when s.area_m2 is not null
+                then least(s.area_m2 / p.area_max_m2, 1) else v_tam end;
+  a_que := case when s.quemas_12m is not null
+                then greatest(v_que, least(s.quemas_12m::numeric / p.quemas_max, 1)) else v_que end;
+  a_cre := case when s.crecimiento_pct is not null
+                then greatest(least(s.crecimiento_pct / 100.0, 1), 0) else v_cre end;
+  fuente := case
+    when s.area_m2 is null and s.quemas_12m is null and s.crecimiento_pct is null then 'relevamiento'
+    when s.area_m2 is not null and s.quemas_12m is not null and s.crecimiento_pct is not null then 'satelite'
+    else 'mixta' end;
   amenaza := (select avg(x) from unnest(array[a_tam, a_que, a_cre]) as x);
 
   -- ---------------- 2. Exposición ----------------
