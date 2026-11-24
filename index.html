@@ -7,6 +7,9 @@
   <meta name="description" content="Denunciá un basural desde el celular, sin crear una cuenta, y conocé el riesgo ambiental y sanitario de cada punto del Gran Resistencia.">
   <title>Basurales en el Gran Resistencia</title>
   <link rel="canonical" href="https://riesgo-ambiental-sanitaro.vercel.app/">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/img/app-192.png">
+  <script src="/pwa.js" defer></script>
 
   <!-- Tarjeta al compartir el link (WhatsApp, Facebook, LinkedIn; X toma estas mismas).
        La imagen se genera con diseno/tarjeta/generar.py -->
@@ -43,9 +46,14 @@
         <p>Gran Resistencia</p>
       </div>
     </div>
-    <button id="btn-info" class="btn-icono" aria-label="Cómo funciona">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.5v6M12 7.2v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-    </button>
+    <div class="barra-acciones">
+      <button id="btn-instalar" type="button" class="btn-icono" aria-label="Instalar Basurales" title="Instalar Basurales" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="btn-info" class="btn-icono" aria-label="Cómo funciona">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.5v6M12 7.2v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
   </header>
 
   <main id="mapa" aria-label="Mapa de basurales"></main>
@@ -186,6 +194,11 @@
     </ul>
     <p class="dialogo-nota tamanos"><span class="puntos" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Cuanto más grande el punto, más grande el basural. Con borde punteado: sin tamaño informado.</p>
     <p class="dialogo-nota">Tocá un punto del mapa para ver su riesgo ambiental y sanitario. Sin señal, el reporte se guarda en tu celular y se envía solo al volver la conexión.</p>
+    <form method="dialog"><button class="btn-petroleo ancho">Entendido</button></form>
+  </dialog>
+  <dialog id="dlg-instalar" aria-labelledby="titulo-instalar">
+    <h2 id="titulo-instalar">Instalar Basurales</h2>
+    <p id="pasos-instalar" class="dialogo-nota"></p>
     <form method="dialog"><button class="btn-petroleo ancho">Entendido</button></form>
   </dialog>
 
