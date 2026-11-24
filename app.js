@@ -75,6 +75,7 @@ L.control.zoom({ position: 'topright' }).addTo(mapa);
 mapa.getContainer().appendChild($('mira'));
 
 const capaPublica = L.layerGroup().addTo(mapa);
+const pantallaChica = window.matchMedia('(max-width: 759px), (max-height: 540px)');
 
 async function cargarReportesPublicos() {
   let data;
@@ -92,13 +93,26 @@ async function cargarReportesPublicos() {
       // sin tamaño informado: borde punteado
       dashArray: r.tamano ? null : '3 3',
     });
-    marcador.bindPopup(htmlPopup(r, null), {
-      maxWidth: 300, minWidth: 260,
-      // Abajo está el panel de la leyenda y el botón (unos 120 px): el popup se
-      // acomoda por encima. Si no entra entero, Leaflet prioriza que se vea el borde de arriba.
-      autoPanPaddingTopLeft: [16, 16], autoPanPaddingBottomRight: [16, 130],
+    marcador.on('click', () => {
+      const contenido = document.createElement('div');
+      contenido.innerHTML = htmlPopup(r, null);
+      if (pantallaChica.matches) {
+        const region = $('ficha-riesgo-contenido');
+        region.replaceChildren(contenido);
+        region.scrollTop = 0;
+        $('dlg-riesgo').showModal();
+        cargarDetalle(contenido, r);
+        return;
+      }
+
+      const popup = L.popup({
+        maxWidth: 300, minWidth: 260, maxHeight: Math.max(160, mapa.getSize().y - 200),
+        autoPanPaddingTopLeft: [16, 16], autoPanPaddingBottomRight: [16, 130],
+      }, marcador).setLatLng(marcador.getLatLng()).setContent(contenido).openOn(mapa);
+      cargarDetalle(contenido, r, () => {
+        if (popup.isOpen()) popup.update();
+      });
     });
-    marcador.on('popupopen', async () => { await cargarRiesgo(marcador, r); cargarFoto(marcador, r); });
     marcador.addTo(capaPublica);
   }
 }
@@ -109,29 +123,25 @@ async function cargarReportesPublicos() {
 const cacheRiesgo = new Map();
 const cacheFoto = new Map();
 
-// El contenido va como elemento y no como texto: cuando llega la foto hay que
-// pedirle a Leaflet que reacomode el popup, y si el contenido fuera texto lo
-// volvería a dibujar desde cero y se perdería la foto ya insertada.
-function nodoPopup(html) {
-  const nodo = document.createElement('div');
-  nodo.innerHTML = html;
-  return nodo;
+function cargarDetalle(contenido, r, actualizar) {
+  cargarRiesgo(contenido.querySelector('.rz-indice'), r, actualizar);
+  cargarFoto(contenido.querySelector('.rz-foto'), r, actualizar);
 }
 
-async function cargarRiesgo(marcador, r) {
-  if (cacheRiesgo.has(r.id)) { marcador.setPopupContent(nodoPopup(htmlPopup(r, cacheRiesgo.get(r.id)))); return; }
-  let riesgo;
-  try {
-    riesgo = (await pedirRiesgo(r.id)) || { error: true };
-    if (!riesgo.error) cacheRiesgo.set(r.id, riesgo);
-  } catch (err) { console.warn('No se pudo calcular el índice', err); riesgo = { error: true }; }
-  marcador.setPopupContent(nodoPopup(htmlPopup(r, riesgo)));
+async function cargarRiesgo(hueco, r, actualizar) {
+  let riesgo = cacheRiesgo.get(r.id);
+  if (!riesgo) {
+    try {
+      riesgo = (await pedirRiesgo(r.id)) || { error: true };
+      if (!riesgo.error) cacheRiesgo.set(r.id, riesgo);
+    } catch (err) { console.warn('No se pudo calcular el índice', err); riesgo = { error: true }; }
+  }
+  hueco.innerHTML = htmlIndice(riesgo);
+  actualizar?.();
 }
 
 // La foto se pide aparte y solo al abrir el popup, para no cargarla en el mapa
-async function cargarFoto(marcador, r) {
-  if (!r.tiene_foto) return;
-  const hueco = marcador.getPopup()?.getElement()?.querySelector('.rz-foto');
+async function cargarFoto(hueco, r, actualizar) {
   if (!hueco) return;
   try {
     let base64 = cacheFoto.get(r.id);
@@ -139,16 +149,17 @@ async function cargarFoto(marcador, r) {
       base64 = await pedirFoto(r.id);
       cacheFoto.set(r.id, base64);
     }
-    if (!base64) { hueco.remove(); return; }
+    if (!base64) { hueco.remove(); actualizar?.(); return; }
     const img = new Image();
     img.alt = 'Foto del basural enviada por un vecino';
     // La foto agranda el popup hacia arriba: reacomodarlo para que no se salga de la pantalla
-    img.addEventListener('load', () => marcador.getPopup()?.update(), { once: true });
+    if (actualizar) img.addEventListener('load', actualizar, { once: true });
     img.src = `data:image/jpeg;base64,${base64}`;
     hueco.replaceChildren(img);
   } catch (err) {
     console.warn('No se pudo cargar la foto', err);
     hueco.textContent = 'No se pudo cargar la foto.';
+    actualizar?.();
   }
 }
 
@@ -165,7 +176,7 @@ function htmlPopup(r, riesgo) {
   const foto = r.tiene_foto ? '<div class="rz-foto">Cargando foto…</div>' : '';
 
   // El índice lo arma indice.js, compartido con el panel de moderación
-  return `<div class="rz">${cabecera}${foto}${htmlIndice(riesgo)}</div>`;
+  return `<div class="rz">${cabecera}${foto}<div class="rz-indice">${htmlIndice(riesgo)}</div></div>`;
 }
 
 // ---------------------------------------------------------------------

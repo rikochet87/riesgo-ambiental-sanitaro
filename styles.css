@@ -257,6 +257,19 @@ dialog h2 { margin: 0 0 12px; font-size: 22px; font-weight: 800; font-stretch: 1
 .toast.error { background: #a61e4d; }
 
 /* ---------- Popup de riesgo ---------- */
+#dlg-riesgo {
+  width: min(440px, calc(100% - 24px)); max-width: none;
+  max-height: calc(100% - 24px); max-height: calc(100dvh - 24px);
+  padding: 0; overflow: hidden;
+}
+#dlg-riesgo[open] { display: flex; flex-direction: column; }
+.ficha-riesgo-cabecera {
+  display: flex; flex: none; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--borde);
+}
+#dlg-riesgo h2 { margin: 0; font-size: 18px; }
+.ficha-riesgo-cabecera button { font-size: 24px; }
+#ficha-riesgo-contenido { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; }
 .leaflet-popup-content-wrapper { border-radius: var(--radio-m); box-shadow: var(--sombra-flotante); }
 .leaflet-popup-content { margin: 14px 16px; }
 .rz { font-size: 13px; line-height: 1.35; color: var(--tinta); }
