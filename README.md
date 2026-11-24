@@ -21,7 +21,7 @@ Saber **dónde** están los basurales y **cuáles** son más riesgosos ayuda a p
 ## Cómo funciona
 
 1. **El vecino reporta.** Marca el punto en el mapa, saca una foto (opcional) y, si quiere, completa un relevamiento corto: tipo de residuos, tamaño, si se quema, desde cuándo está. Funciona sin señal: el reporte queda guardado y se envía solo al recuperarla.
-2. **Un moderador revisa.** Desde el panel `/admin` publica o descarta cada reporte, decide si la foto se muestra y puede quitarla (caras, patentes) o eliminar el reporte entero.
+2. **Un moderador revisa.** Desde el panel `/admin` publica o descarta cada reporte, decide si la foto se muestra y puede quitarla (caras, patentes), corrige el tamaño mirando la foto, marca "ya no está" cuando un basural desaparece o elimina el reporte entero.
 3. **El mapa público** muestra los basurales activos ya revisados. El **color** es su riesgo (rojo alto, amarillo medio, verde bajo) y el **tamaño del punto**, el tamaño del basural; con borde punteado, si no se informó. Al tocar uno se ve la foto aprobada y el índice de riesgo con sus componentes. Cuando un basural desaparece, el moderador lo marca "ya no está" y deja de verse.
 
 **Privacidad.** Nunca se muestra quién reportó. Las fotos pierden en el celular la ubicación que traen y no se publican hasta que alguien las revisa. El público solo puede *cargar* reportes: no puede leer los ajenos, ni editarlos, ni borrarlos. El mapa público redondea las coordenadas a unos 11 m.
@@ -143,7 +143,7 @@ El procedimiento de cada script, con fechas y resultados, está en `scripts/READ
 | `package.json` | Dependencias de las funciones y comandos `npm test` / `npm run local` |
 | `pruebas/` | Pruebas de `/api` y un servidor local que imita a Vercel |
 | `neon/schema.sql` | Tabla, permisos, reglas, topes, vista pública y fotos |
-| `neon/riesgo.sql` | Índice de riesgo y capas de contexto |
+| `neon/riesgo.sql` | Índice de riesgo, capas de contexto e índice guardado (`riesgo_cache`) |
 | `neon/moderacion.sql` | Rol `moderador`, tope de intentos de entrada y registro de copias de seguridad |
 | `admin.html`, `admin.js`, `admin.css` | Panel de moderación (`/admin`) |
 | `admin-zip.js` | Arma el ZIP de la copia de seguridad en el navegador |
@@ -179,7 +179,7 @@ Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` car
 - Reglas en la base: punto dentro del Gran Resistencia, valores válidos en las listas, comentario de hasta 500 caracteres, foto de hasta 400 KB.
 - **Topes:** 200 reportes por hora en total (se cambia en `reportes_control_insercion`) y rechazo de reportes a menos de 20 m de otro de los últimos 10 minutos.
 - **Fotos:** el navegador las achica a 1000 px y unos 200 KB, y al redibujarlas se pierden los metadatos, incluida la ubicación GPS. Viajan dentro del reporte y se guardan en la misma tabla. El público nunca lee esa columna: la foto se sirve de a una, ya aprobada, con la función `foto_basural()`.
-- **Mapa público:** lee solo la vista `reportes_publicos`, con reportes ya revisados, coordenadas redondeadas (~11 m) y sin comentario ni foto.
+- **Mapa público:** lee solo la vista `reportes_publicos`, con los basurales activos ya revisados, su clase de riesgo, coordenadas redondeadas (~11 m) y sin comentario ni foto. Los marcados "ya no está" no figuran. La tabla del índice guardado no la puede leer: solo la vista.
 - **PostGIS** vive en el esquema `gis`, no en `public`, separado de las tablas del proyecto.
 - **Bots:** campo trampa invisible; si se completa, no se envía nada.
 
