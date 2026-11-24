@@ -52,38 +52,48 @@ alter table public.reportes
 -- ---------------------------------------------------------------------
 -- Tope de intentos de entrada al panel
 -- ---------------------------------------------------------------------
--- Global y no por IP: una IP se cambia fácil. Con 10 fallidos en 15 minutos
--- se bloquea la entrada (también con la clave correcta) hasta que pasen.
--- Quien insista solo consigue dejarte afuera un rato; el sitio público sigue igual.
+-- Por origen (desde 2026-11-24; antes era global y cualquiera podía dejar
+-- afuera al moderador con 10 claves falsas). Con 10 fallidos en 15 minutos
+-- se bloquea ese origen, también con la clave correcta. Como respaldo contra
+-- un ataque desde muchas conexiones, con 300 fallidos en 15 minutos entre
+-- todos se bloquea la entrada para todos. El origen es el mismo código diario
+-- de la IP que usan los topes de reportes (no se guarda la IP).
 create table if not exists public.admin_intentos (
   creado_en timestamptz not null default now(),
   ok        boolean not null
 );
+alter table public.admin_intentos add column if not exists origen text;
 alter table public.admin_intentos enable row level security;
 revoke all on public.admin_intentos from anonymous, authenticated, moderador;
 
 -- Anota el intento y dice si se puede entrar. La llama /api/admin/entrar
 -- con el rol anonymous, después de comparar la clave.
-create or replace function public.admin_intento(p_ok boolean)
+create or replace function public.admin_intento(p_ok boolean, p_origen text)
 returns boolean
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  fallidos integer;
+  v_origen text := coalesce(nullif(p_origen, ''), 'sin-origen');
+  del_origen integer;
+  de_todos   integer;
 begin
   delete from public.admin_intentos where creado_en < now() - interval '1 day';
-  select count(*) into fallidos
+  select count(*) filter (where origen = v_origen), count(*)
+    into del_origen, de_todos
   from public.admin_intentos
   where not ok and creado_en > now() - interval '15 minutes';
-  insert into public.admin_intentos (ok) values (p_ok);
-  return p_ok and fallidos < 10;
+  insert into public.admin_intentos (ok, origen) values (p_ok, v_origen);
+  return p_ok and del_origen < 10 and de_todos < 300;
 end;
 $$;
 
-revoke all on function public.admin_intento(boolean) from public;
-grant execute on function public.admin_intento(boolean) to anonymous;
+revoke all on function public.admin_intento(boolean, text) from public;
+grant execute on function public.admin_intento(boolean, text) to anonymous;
+
+-- La versión anterior, sin origen, ya no se usa
+drop function if exists public.admin_intento(boolean);
 
 -- ---------------------------------------------------------------------
 -- Copias de seguridad descargadas desde el panel

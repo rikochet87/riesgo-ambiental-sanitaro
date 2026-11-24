@@ -75,6 +75,13 @@ Los colores por estado (activo, en gestión, resuelto) suponían un seguimiento 
 - El índice de cada activo se guarda en `riesgo_cache` (calcularlo tarda ~25 ms): se recalcula al moderar (el reporte y sus activos a 300 m), al cargar capas o satélite (todos) y en las visitas (hasta 20 de más de un día).
 - Alternativas consideradas: color por tamaño solo (deja afuera exposición y agua) y color por riesgo solo.
 
+## Topes por conexión (2026-11-24, auditoría de seguridad)
+La auditoría mostró que con el tope global solo, una sola conexión podía llenar el 1 GB de Neon con fotos en unas 11 horas y, de paso, frenar a todos; y que 10 claves falsas desde cualquier lado dejaban afuera al moderador.
+- Alta de reportes: por conexión, 10 por hora, 30 por día y 3 MB de fotos por hora; entre todos, 150 MB de fotos por día (además de los 200 reportes por hora que ya había).
+- Panel: el bloqueo por 10 fallidos en 15 minutos es por conexión; respaldo global de 300 fallidos.
+- Privacidad: no se guarda la IP. Se usa un HMAC diario (llave derivada de un secreto de Vercel), en una tabla aparte sin el id del reporte, que se vacía a las 24 h.
+- Alternativas consideradas: regla de tope en el firewall de Vercel (depende del plan y queda fuera del repositorio) y captcha (sigue pendiente, por si aparece spam).
+
 ## Puntos a resolver
 - El plan Hobby de Vercel es para uso personal y no comercial. Si el proyecto lo adoptara un organismo, haría falta otro plan.
 - Tope por hora sin cuentas: un tope global en la base es simple y seguro. Un tope por IP es fácil de eludir; para eso sirve Turnstile.

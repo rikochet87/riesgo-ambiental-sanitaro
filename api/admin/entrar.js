@@ -2,6 +2,7 @@
 // DELETE /api/admin/entrar          → la cierra
 import { comoPublico } from '../_db.js';
 import { json, errorDeBase } from '../_http.js';
+import { origenDe } from '../_origen.js';
 import { claveConfigurada, claveCorrecta, cookieDeSesion, cookieVencida, leerJSON, CLAVE_MINIMA } from '../_admin.js';
 
 export async function POST(request) {
@@ -16,11 +17,12 @@ export async function POST(request) {
   const intento = typeof datos?.clave === 'string' ? datos.clave : '';
   const ok = claveCorrecta(intento);
 
-  // La base anota el intento y decide: con 10 fallidos en 15 minutos no
-  // deja entrar, aunque esta vez la clave sea la correcta.
+  // La base anota el intento y decide: con 10 fallidos en 15 minutos desde
+  // la misma conexión no la deja entrar, aunque esta vez la clave sea la
+  // correcta. Otra conexión (la del moderador) sigue pudiendo.
   let permitido;
   try {
-    const [[fila]] = await comoPublico([['select public.admin_intento($1) as permitido', [ok]]]);
+    const [[fila]] = await comoPublico([['select public.admin_intento($1, $2) as permitido', [ok, origenDe(request)]]]);
     permitido = fila.permitido;
   } catch (err) {
     return errorDeBase(err);

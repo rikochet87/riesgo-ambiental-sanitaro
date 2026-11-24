@@ -2,6 +2,7 @@
 // POST /api/reportes  → alta de un reporte vecinal
 import { comoPublico } from './_db.js';
 import { json, malPedido, errorDeBase, UUID } from './_http.js';
+import { origenDe } from './_origen.js';
 
 // Lo único que un vecino puede mandar. Coincide con el GRANT de la base;
 // cualquier otra clave del JSON (estado, foto_aprobada...) se descarta.
@@ -61,10 +62,12 @@ export async function POST(request) {
   const columnas = COLUMNAS.filter((c) => datos[c] !== undefined && datos[c] !== null);
   const marcas = columnas.map((_, i) => `$${i + 1}`);
   try {
-    await comoPublico([[
-      `insert into public.reportes (${columnas.join(', ')}) values (${marcas.join(', ')})`,
-      columnas.map((c) => datos[c]),
-    ]]);
+    await comoPublico([
+      // Código diario de la conexión (no la IP) para los topes por origen del trigger
+      ['select set_config($1, $2, true)', ['app.origen', origenDe(request) || '']],
+      [`insert into public.reportes (${columnas.join(', ')}) values (${marcas.join(', ')})`,
+       columnas.map((c) => datos[c])],
+    ]);
     return json({ ok: true, id: datos.id }, 201);
   } catch (err) {
     return errorDeBase(err);

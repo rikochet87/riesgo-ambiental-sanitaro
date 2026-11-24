@@ -43,6 +43,7 @@ async function sesion() {
 before(async () => {
   usarEjecutorDePrueba(ejecutorLocal);
   await admin('truncate public.reportes cascade');
+  await admin('truncate public.limite_origen');
   for (const [id, extra] of [[ID_FOTO, { foto_entrada: FOTO, descripcion: '<img src=x onerror=alert(1)> junto al canal' }],
                              [ID_SIN_FOTO, { lat: -27.48 }]]) {
     const r = await reportesPublicos.POST(new Request(SITIO + '/api/reportes', {
@@ -60,6 +61,7 @@ after(async () => {
   await admin('truncate public.reportes cascade');
   await admin('truncate public.admin_intentos');
   await admin('truncate public.admin_copias');
+  await admin('truncate public.limite_origen');
 });
 
 test('sin ADMIN_CLAVE, o con una de menos de 12 caracteres, el panel no abre', async () => {
@@ -299,6 +301,25 @@ test('10 claves incorrectas bloquean la entrada 15 minutos, aunque después veng
   assert.equal(r.estado, 429);
   assert.equal(r.cuerpo.code, 'BLOQUEADO');
   assert.equal(r.cookie, null);
+});
+
+const entrarDesde = async (ip, clave) => leer(await entrar.POST(new Request(SITIO + '/api/admin/entrar', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Origin: SITIO, 'X-Forwarded-For': ip },
+  body: JSON.stringify({ clave }),
+})));
+
+test('el bloqueo es por conexión: 10 claves falsas desde otra IP no dejan afuera al moderador', async () => {
+  for (let i = 0; i < 10; i++) assert.equal((await entrarDesde('181.40.0.66', `falsa-${i}`)).estado, 401);
+  assert.equal((await entrarDesde('181.40.0.66', CLAVE)).estado, 429, 'la conexión que insistió queda bloqueada');
+  const moderador = await entrarDesde('181.40.0.7', CLAVE);
+  assert.equal(moderador.estado, 200, 'el moderador entra desde su conexión');
+  const [{ n }] = await admin(`select count(*)::int as n from public.admin_intentos where origen like '%181.40%'`);
+  assert.equal(n, 0, 'no se guarda la IP');
+});
+
+test('respaldo: con 300 fallidos en 15 minutos entre todos, se bloquea para todos', async () => {
+  await admin(`insert into public.admin_intentos (ok, origen) select false, 'origen-' || n from generate_series(1, 300) n`);
+  assert.equal((await entrarDesde('181.40.0.8', CLAVE)).estado, 429);
 });
 
 test('copia de seguridad: sin sesión no hay nada; con sesión, todos los datos y coordenadas completas', async () => {

@@ -177,7 +177,8 @@ Con un PostgreSQL + PostGIS local y una base `prueba_api` con los dos `.sql` car
 - La lista de columnas que acepta el alta es fija: cualquier otra clave del JSON (`estado`, `foto_aprobada`...) se descarta.
 - La página solo puede conectarse con su propio dominio (`connect-src 'self'` en la CSP de `vercel.json`).
 - Reglas en la base: punto dentro del Gran Resistencia, valores válidos en las listas, comentario de hasta 500 caracteres, foto de hasta 400 KB.
-- **Topes:** 200 reportes por hora en total (se cambia en `reportes_control_insercion`) y rechazo de reportes a menos de 20 m de otro de los últimos 10 minutos.
+- **Topes:** 200 reportes por hora en total y rechazo de reportes a menos de 20 m de otro de los últimos 10 minutos. Desde la misma conexión: 10 reportes por hora, 30 por día y 3 MB de fotos por hora. Entre todos: 150 MB de fotos por día. Todo se ajusta en `reportes_control_insercion`.
+- **Origen sin IP:** para los topes por conexión, la función manda a la base un código diario: un HMAC de la IP con una llave secreta y la fecha. No se puede volver a la IP, cambia cada día, no se guarda junto al reporte y se borra a las 24 horas (tabla `limite_origen`, que nadie más que el dueño de la base puede leer). La IP la escribe Vercel y no se puede falsificar; en IPv6 se cuenta por prefijo /64. Varios celulares pueden compartir IP (CGNAT de las compañías móviles), así que los topes son holgados.
 - **Fotos:** el navegador las achica a 1000 px y unos 200 KB, y al redibujarlas se pierden los metadatos, incluida la ubicación GPS. Viajan dentro del reporte y se guardan en la misma tabla. El público nunca lee esa columna: la foto se sirve de a una, ya aprobada, con la función `foto_basural()`.
 - **Mapa público:** lee solo la vista `reportes_publicos`, con los basurales activos ya revisados, su clase de riesgo, coordenadas redondeadas (~11 m) y sin comentario ni foto. Los marcados "ya no está" no figuran. La tabla del índice guardado no la puede leer: solo la vista.
 - **PostGIS** vive en el esquema `gis`, no en `public`, separado de las tablas del proyecto.
@@ -216,7 +217,7 @@ El ZIP se arma en el navegador porque Vercel no deja que una función devuelva m
 
 **Seguridad del panel:**
 - La sesión es una cookie firmada, válida 8 horas, que solo viaja a `/api/admin`, no la puede leer JavaScript y no se manda desde otros sitios. Cambiar `ADMIN_CLAVE` cierra todas las sesiones.
-- Con 10 claves incorrectas en 15 minutos se bloquea la entrada (incluso con la correcta) hasta que pasen.
+- Con 10 claves incorrectas en 15 minutos **desde la misma conexión** se bloquea esa conexión (incluso con la correcta) hasta que pasen; desde otra se puede seguir entrando. Como respaldo, con 300 fallidos en 15 minutos entre todos se bloquea para todos.
 - Las funciones del panel trabajan con el rol `moderador` de la base, que puede leer reportes, cambiar estado, foto y nota, corregir el tamaño (en una columna aparte) y eliminar un reporte entero, pero **no puede mover su ubicación ni editar lo que escribió el vecino**, aunque el código tuviera un error.
 - Lo que escribe el vecino se muestra siempre como texto, nunca como HTML.
 

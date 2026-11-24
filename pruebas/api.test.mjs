@@ -17,6 +17,8 @@ import { usarEjecutorDePrueba } from '../api/_db.js';
 import * as reportes from '../api/reportes.js';
 import * as foto from '../api/foto.js';
 import * as riesgo from '../api/riesgo.js';
+import { normalizarIP, origenDe } from '../api/_origen.js';
+import { randomBytes } from 'node:crypto';
 
 const URL_BASE = 'https://riesgo-ambiental-sanitaro.vercel.app';
 const pedir = (ruta, opciones) => new Request(URL_BASE + ruta, opciones);
@@ -35,9 +37,11 @@ const FOTO = Buffer.from('foto de prueba').toString('base64');
 before(async () => {
   usarEjecutorDePrueba(ejecutorLocal);
   await admin('truncate public.reportes cascade');
+  await admin('truncate public.limite_origen');
 });
 after(async () => {
   await admin('truncate public.reportes cascade');
+  await admin('truncate public.limite_origen');
 });
 
 test('el mapa público arranca vacío y se cachea un minuto en la CDN', async () => {
@@ -238,5 +242,70 @@ test('sin DATABASE_URL en Vercel responde 503 / SIN_CONFIG', async () => {
   } finally {
     if (guardada !== undefined) process.env.DATABASE_URL = guardada;
     usarEjecutorDePrueba(ejecutorLocal);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Topes por origen (desde 2026-11-24)
+// ---------------------------------------------------------------------
+const desde = (ip) => ({ 'X-Forwarded-For': ip });
+// Puntos separados ~110 m entre sí, para no chocar con el control de duplicados
+let paso = 0;
+const otroPunto = () => { paso += 1; return { lat: -27.55 + paso * 0.001, lon: -58.90 }; };
+const altaDesde = async (ip, extra = {}) =>
+  leer(await reportes.POST(postJSON({ id: crypto.randomUUID(), ...otroPunto(), ...extra }, desde(ip))));
+
+test('origen: la IP no se guarda; IPv6 cuenta por /64 y el código cambia cada día', async () => {
+  assert.equal(normalizarIP('2800:810:4a1:1234:aaaa::1'), normalizarIP('2800:0810:04a1:1234:bbbb:0:0:2'));
+  assert.notEqual(normalizarIP('2800:810:4a1:1234::1'), normalizarIP('2800:810:4a1:1235::1'));
+  assert.equal(normalizarIP('::ffff:181.1.2.3'), '181.1.2.3');
+  const pedido = pedir('/', { headers: desde('181.1.2.3, 10.0.0.1') });
+  const hoy = origenDe(pedido, new Date('2026-11-24T12:00:00Z'));
+  assert.equal(hoy, origenDe(pedir('/', { headers: desde('181.1.2.3') }), new Date('2026-11-24T20:00:00Z')));
+  assert.notEqual(hoy, origenDe(pedido, new Date('2026-11-25T12:00:00Z')));
+  assert.ok(!hoy.includes('181'));
+  assert.equal(origenDe(pedir('/')), null, 'sin IP (pruebas locales) no hay código');
+});
+
+test('origen: 10 reportes por hora desde la misma conexión; otra conexión sigue pudiendo', async () => {
+  await admin('truncate public.limite_origen');
+  for (let i = 0; i < 10; i++) assert.equal((await altaDesde('181.10.0.1')).estado, 201, `alta ${i + 1}`);
+  const once = await altaDesde('181.10.0.1');
+  assert.equal(once.estado, 429);
+  assert.match(once.cuerpo.message, /desde tu conexión/);
+  assert.equal((await altaDesde('181.10.0.2')).estado, 201, 'otra conexión no queda bloqueada');
+
+  const filas = await admin('select * from public.limite_origen');
+  assert.equal(filas.length, 11, 'el alta rechazada no deja rastro');
+  assert.deepEqual(Object.keys(filas[0]).sort(), ['bytes', 'creado_en', 'origen'], 'sin id de reporte ni IP');
+  assert.ok(filas.every((f) => !f.origen.includes('181.10')));
+});
+
+test('origen: tope de 3 MB de fotos por hora; sin foto se puede seguir reportando', async () => {
+  await admin('truncate public.limite_origen');
+  const foto = randomBytes(390_000).toString('base64');  // ~390 KB, debajo del máximo por foto (400 KB)
+  for (let i = 0; i < 7; i++) assert.equal((await altaDesde('181.20.0.1', { foto_entrada: foto })).estado, 201);
+  const octava = await altaDesde('181.20.0.1', { foto_entrada: foto });
+  assert.equal(octava.estado, 429);
+  assert.match(octava.cuerpo.message, /muchas fotos/);
+  assert.equal((await altaDesde('181.20.0.1')).estado, 201);
+});
+
+test('tope diario de fotos entre todos: 150 MB', async () => {
+  await admin('truncate public.limite_origen');
+  await admin(`insert into public.limite_origen (origen, bytes) values ('otros', 149990000)`);
+  const r = await altaDesde('181.30.0.1', { foto_entrada: FOTO.repeat(1000) });
+  assert.equal(r.estado, 429);
+  assert.match(r.cuerpo.message, /límite de fotos/);
+  assert.equal((await altaDesde('181.30.0.1')).estado, 201, 'sin foto entra');
+  await admin('truncate public.limite_origen');
+});
+
+test('la tabla de orígenes no la puede leer ni tocar el público ni el moderador', async () => {
+  for (const rol of ['anonymous', 'moderador']) {
+    for (const sql of ['select * from public.limite_origen', 'delete from public.limite_origen',
+                       `insert into public.limite_origen (origen) values ('x')`]) {
+      await assert.rejects(ejecutorLocal(rol, [[sql, []]]), (e) => e.code === '42501', `${rol}: ${sql}`);
+    }
   }
 });
